@@ -1,0 +1,45 @@
+appId: com.edupilot.dz
+productName: Edupilot DZ
+copyright: Copyright © 2026 Edupilot DZ
+buildVersion: 1.0.0
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: src/renderer/assets/sounds
+    to: sounds
+  - from: src/renderer/assets/fonts
+    to: fonts
+
+win:
+  target:
+    - nsis
+  icon: build/icons/icon.ico
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Edupilot DZ
+  deleteAppDataOnUninstall: false
+  installerIcon: build/icons/icon.ico
+  uninstallerIcon: build/icons/icon.ico
+  installerHeaderIcon: build/icons/icon.ico
+  license: false
+  menuCategory: true
+  artifactName: EdupilotDZ-Setup-${version}.exe
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+compression: maximum

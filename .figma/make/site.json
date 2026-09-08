@@ -1,0 +1,10 @@
+{
+  "description": "Effortlessly create and organize desktop application pages in a single folder, streamlining development for designers and developers.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

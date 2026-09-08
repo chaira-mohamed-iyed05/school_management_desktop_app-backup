@@ -1,0 +1,510 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edupilot DZ — Complete Project & Technical Documentation</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 2cm;
+      }
+      body {
+        -webkit-print-color-adjust: exact;
+      }
+      h1, h2 {
+        page-break-after: avoid;
+      }
+      table, tr {
+        page-break-inside: avoid;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #1E293B;
+      line-height: 1.6;
+      background: #FFF;
+    }
+    h1 {
+      color: #1E3A8A;
+      font-size: 28px;
+      border-bottom: 3px solid #2563EB;
+      padding-bottom: 10px;
+      margin-top: 30px;
+    }
+    h2 {
+      color: #1E40AF;
+      font-size: 20px;
+      border-bottom: 1px solid #E2E8F0;
+      padding-bottom: 6px;
+      margin-top: 24px;
+    }
+    h3 {
+      color: #0F172A;
+      font-size: 16px;
+      margin-top: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13px;
+    }
+    th {
+      background-color: #1E3A8A;
+      color: white;
+      border: 1px solid #CBD5E1;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    td {
+      border: 1px solid #CBD5E1;
+      padding: 9px 12px;
+    }
+    tr:nth-child(even) {
+      background-color: #F8FAFC;
+    }
+    blockquote {
+      background-color: #EFF6FF;
+      border-left: 4px solid #2563EB;
+      color: #1E40AF;
+      padding: 12px 16px;
+      margin: 16px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    code {
+      background-color: #F1F5F9;
+      color: #0F172A;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 12px;
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #E2E8F0;
+      margin: 28px 0;
+    }
+    a {
+      color: #2563EB;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h1 style="color: #1E3A8A; font-family: Calibri, Arial, sans-serif; font-size: 26pt; font-weight: bold; margin-top: 24pt; margin-bottom: 12pt; border-bottom: 2px solid #2563EB; padding-bottom: 6pt;">Edupilot DZ — Complete Project & Technical Documentation</h1></p>
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><blockquote style="background-color: #EFF6FF; border-left: 4px solid #2563EB; color: #1E40AF; padding: 10px 15px; margin: 12px 0; font-style: italic;"><strong>System Overview</strong>: Offline-first, enterprise-grade Desktop School Management System tailored for educational centers in Algeria (<em>Edupilot DZ</em>). Built with Electron, React 19, TypeScript, Vite, Tailwind CSS v4, and Better-SQLite3 with Drizzle ORM.</blockquote></p>
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">📐 1. System Architecture & Tech Stack</h2></p>
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">graph TD</p>
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">A["Electron Main Process (Node.js)"] <-->|IPC Channels via ContextBridge| B["Electron Preload Script (CJS)"]</p>
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">B <-->|window.schoolApp| C["React 19 Renderer (Vite + Tailwind v4)"]</p>
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">A <--> D["Better-SQLite3 Database (Drizzle ORM)"]</p>
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">A <--> E["Local Media / Asset Storage"]</p>
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">A <--> F["Backup / Export Engine (ZIP / Archiver)"]</p>
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">Core Technologies</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>Desktop Shell</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/package.json#L68" style="color: #2563EB; text-decoration: underline;">Electron 32</a></li>
+  <li style="margin-bottom: 4px;"><strong>UI Framework</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/package.json#L43" style="color: #2563EB; text-decoration: underline;">React 19</a> + <a href="file:///d:/Projects/school-management-Desktop-app/package.json#L47" style="color: #2563EB; text-decoration: underline;">React Router 7</a></li>
+  <li style="margin-bottom: 4px;"><strong>Styling</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/package.json#L74" style="color: #2563EB; text-decoration: underline;">Tailwind CSS v4</a> + Lucide Icons</li>
+  <li style="margin-bottom: 4px;"><strong>Build Tooling</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/electron.vite.config.ts" style="color: #2563EB; text-decoration: underline;">electron-vite</a> + <a href="file:///d:/Projects/school-management-Desktop-app/tsconfig.json" style="color: #2563EB; text-decoration: underline;">TypeScript 5.7</a></li>
+  <li style="margin-bottom: 4px;"><strong>Database Engine</strong>: Better-SQLite3 with Drizzle ORM (<a href="file:///d:/Projects/school-management-Desktop-app/src/main/database/schema.ts" style="color: #2563EB; text-decoration: underline;">schema.ts</a>)</li>
+  <li style="margin-bottom: 4px;"><strong>Localization</strong>: i18next (<a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/i18n/i18n.ts" style="color: #2563EB; text-decoration: underline;">AR / FR / EN</a>)</li>
+  <li style="margin-bottom: 4px;"><strong>Packaging</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/electron-builder.yml" style="color: #2563EB; text-decoration: underline;">electron-builder</a> producing standalone Windows <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">.exe</code> installers.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">🗄️ 2. Database Schema Reference</h2></p>
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">The system relies on SQLite located in user data, structured with Drizzle ORM in <a href="file:///d:/Projects/school-management-Desktop-app/src/main/database/schema.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/main/database/schema.ts</code></a>:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <tr style="background-color: #1E3A8A; color: #FFFFFF; font-weight: bold;">
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Table Name</th>
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Description</th>
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Key Fields & Constraints</th>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">users</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Admin accounts</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">username</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">passwordHash</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">role</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">pinCode</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Student master records</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">studentNumber</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">firstNameAr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">lastNameAr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">firstNameFr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">lastNameFr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">phone</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">dateOfBirth</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">address</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">guardianName</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">guardianPhone</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">guardianRelationship</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">photoPath</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">qrToken</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">qrTokenActive</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">active</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">archived</code>)</td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">teachers</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Teacher profiles</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">firstName</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">lastName</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">courseId</code> <em>(foreign key to courses — 1 teacher = 1 module)</em>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">phone</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">email</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">address</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">photoPath</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">courses</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Subject modules</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">nameAr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">nameFr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">nameEn</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">descriptionAr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">descriptionFr</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">defaultPrice</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groups</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Student study groups</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">courseId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">teacherId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">name</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">capacity</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">monthlyPrice</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">startDate</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">endDate</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">room</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">enrollments</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Group registrations</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">studentId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groupId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">agreedPrice</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">enrollmentDate</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">active</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">inactive</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">completed</code>)</td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">schedules</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Weekly timetable slots</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groupId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">weekday</code> (0-6), <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">startTime</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">endTime</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">room</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">isActive</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance_sessions</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Specific lesson instances</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groupId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">sessionDate</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">plannedStartTime</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">endTime</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">room</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">teacherId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">price</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">sessionType</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">regular</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">extra</code>), <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">open</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">closed</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">cancelled</code>)</td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance_records</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Student session status</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">sessionId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">studentId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendanceStatus</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">present</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">absent</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">late</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">not_active</code>), <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">scannedAt</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">source</code></td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Receipts & transactions</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">id</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">studentId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">enrollmentId</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">billingPeriod</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">amount</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">paymentMethod</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">cash</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">transfer</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">ccp</code>), <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">paymentDate</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">receiptNumber</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">status</code> (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">paid</code>/<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">cancelled</code>)</td>
+  </tr>
+  <tr style="background-color: #F8FAFC;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><strong><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">settings</code></strong></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">App parameters</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">key</code> (primary), <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">value</code></td>
+  </tr>
+</table>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">🖥️ 3. Detailed Page-by-Page Documentation</h2></p>
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;">Every page in <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages</code></a> is detailed below with its purpose, UI components, file links, and key workflows.</p>
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">🔑 1. Setup Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Setup.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Setup.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Initial application bootstrap for first-time installation.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">Administrator registration form (Username, Password, PIN code confirmation).</li>
+  <li style="margin-bottom: 4px;">School profile configuration (School Name in Arabic & French, Contact Phone, City/Address).</li>
+  <li style="margin-bottom: 4px;">Automatic database initialization and admin session creation.</li>
+  <li style="margin-bottom: 4px;"><strong>UX & Logic</strong>: Shown automatically when no admin user exists in SQLite database. Directs user to Dashboard upon completion.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">🔒 2. Login Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Login.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Login.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Secure authentication portal for staff and administrators.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">Dual authentication mode: Full Password OR Quick 4-digit PIN Code.</li>
+  <li style="margin-bottom: 4px;">Brute-force protection: Automatic account lockout after consecutive failed attempts.</li>
+  <li style="margin-bottom: 4px;">Language toggle (AR / FR / EN) on login screen.</li>
+  <li style="margin-bottom: 4px;">Session persistence and auto-lock state handling.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">📊 3. Dashboard Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Dashboard.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Dashboard.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Central control hub providing high-level KPIs, live session triggers, and the Interactive Weekly Spreadsheet Schedule.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>KPI Summary Cards</strong>: Active Students count, Total Teachers, Total Groups, Monthly Income summary, Today's Scheduled Sessions.</li>
+  <li style="margin-bottom: 4px;"><strong>Interactive Weekly Spreadsheet Schedule Table</strong>:</li>
+  <li style="margin-bottom: 4px;">Spreadsheet layout with Days of the week as column headers (Saturday through Friday) and Time slots as row headers.</li>
+  <li style="margin-bottom: 4px;">Session containers rendered directly at their starting hour slot.</li>
+  <li style="margin-bottom: 4px;">Deep nested detail view: Module name -> Teacher name -> Exact session time.</li>
+  <li style="margin-bottom: 4px;">Hierarchical filter bar: <strong>Module Filter</strong> -> <strong>Teacher Filter</strong> -> <strong>Group Filter</strong> with instant text searching and a <strong>Reset Filters</strong> button.</li>
+  <li style="margin-bottom: 4px;">Direct session drilldown: Clicking any schedule card navigates directly to the live attendance Terminal for that exact session.</li>
+  <li style="margin-bottom: 4px;"><strong>Today's Live Sessions Panel</strong>: Quick actions to launch live attendance scanner, view student rosters, or start unscheduled extra sessions.</li>
+  <li style="margin-bottom: 4px;"><strong>Quick Action Bar</strong>: Shortcuts for registering new students, collecting payments, or generating reports.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">👥 4. Students Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Students.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Students.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Master directory for searching, filtering, and managing student registrations.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Hierarchical Combobox Filter</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Module Combobox</strong>: Selects subject module with searchable text.</li>
+  <li style="margin-bottom: 4px;"><strong>Teacher Combobox</strong>: Auto-filters teachers belonging to selected module.</li>
+  <li style="margin-bottom: 4px;"><strong>Group Combobox</strong>: Displays groups under selected teacher & module.</li>
+  <li style="margin-bottom: 4px;"><strong>Bi-directional Auto-fill</strong>: Selecting a Group automatically auto-populates Teacher and Module fields.</li>
+  <li style="margin-bottom: 4px;"><strong>Payment Status Filter</strong>: Toggle between <strong>All Students</strong>, <strong>Paid (0 DA Debt)</strong>, and <strong>In-Debt (Negative Balance)</strong>.</li>
+  <li style="margin-bottom: 4px;"><strong>Status Tabs</strong>: Active Students tab vs. Archived Students tab.</li>
+  <li style="margin-bottom: 4px;"><strong>Search & Pagination</strong>: Live searching by name (Arabic or Latin), matricule number, or phone number.</li>
+  <li style="margin-bottom: 4px;"><strong>Student Cards & List View</strong>: Displays photo, student matricule, enrolled modules count, debt badges, and quick link to full Student Profile.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">📝 5. Student Form Page (Add / Edit)</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/StudentForm.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/StudentForm.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Registration and editing modal/form for individual student records.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Bilingual Identity Input</strong>: Arabic First/Last Name and French/Latin First/Last Name.</li>
+  <li style="margin-bottom: 4px;"><strong>Numeric Normalization</strong>: Converts Eastern Arabic (٠-٩) and Persian (۰-۹) digits into standard ASCII numbers in real-time (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">normalizeNumberInput</code>).</li>
+  <li style="margin-bottom: 4px;"><strong>Contact & Demographics</strong>: Phone number, Date of Birth, Home Address.</li>
+  <li style="margin-bottom: 4px;"><strong>Guardian & Tuteur Section</strong>: Guardian Name, Phone, and Family Relationship (Father, Mother, Uncle, etc.).</li>
+  <li style="margin-bottom: 4px;"><strong>Photo Upload & Cropping</strong>: Profile picture selection via local file dialog.</li>
+  <li style="margin-bottom: 4px;"><strong>Initial Group Enrollment</strong>: Option to immediately enroll student into an active study group upon creation.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">👤 6. Student Profile Page (360° Student Hub)</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/StudentProfile.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/StudentProfile.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Detailed individual student management dashboard containing financial balances, module enrollments, attendance audit logs, and identity cards.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Profile Summary Header</strong>: Profile photo, QR token status badge, matricule number, contact info, and overall debt/paid badge.</li>
+  <li style="margin-bottom: 4px;"><strong>Per-Enrollment Credit Tracking</strong>: Displays financial balance (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">+Balance</code> or <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">Debt</code>) and remaining session counters for each group enrollment separately.</li>
+  <li style="margin-bottom: 4px;"><strong>Module Active/Inactive Toggle</strong>: Allows administrators to toggle a student's status per module between <strong>Active</strong> and <strong>Inactive</strong> (suspended). Inactive modules block attendance deductions.</li>
+  <li style="margin-bottom: 4px;"><strong>Credit Transfer Modal</strong>: Enables transferring unused financial balance from one course/group to another (e.g., when a student stops Mathematics to take Physics instead), with optional group closure.</li>
+  <li style="margin-bottom: 4px;"><strong>Session History Audit Log</strong>:</li>
+  <li style="margin-bottom: 4px;">Complete chronological log of all past sessions for the student.</li>
+  <li style="margin-bottom: 4px;">Real-time attendance status override buttons: <strong>Present</strong>, <strong>Late</strong>, <strong>Absent</strong>, and <strong>Not Active</strong>.</li>
+  <li style="margin-bottom: 4px;"><strong>Automated Refund Engine</strong>: Marking a session as <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">Not Active</code> automatically refunds the session cost back to the student's group credit balance.</li>
+  <li style="margin-bottom: 4px;"><strong>Identity & QR Card Generator</strong>: Real-time rendering of QR code canvas containing full student payload, with instant <strong>Regenerate QR Token</strong> trigger.</li>
+  <li style="margin-bottom: 4px;"><strong>Notes & Administrative Log Timeline</strong>: Add and view internal admin notes with timestamp and administrator username.</li>
+  <li style="margin-bottom: 4px;"><strong>Student Archive / Restore Actions</strong>: Safe archiving and one-click restoration with QR re-activation.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">🪪 7. Student Card Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/StudentCard.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/StudentCard.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Printable student identity card and QR badge generator.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">High-resolution vector QR code containing matricule, full bilingual name, and encrypted token.</li>
+  <li style="margin-bottom: 4px;">School logo and customized branding headers.</li>
+  <li style="margin-bottom: 4px;">Single card print mode vs. Batch multi-student card layout.</li>
+  <li style="margin-bottom: 4px;">Direct print triggers formatted for standard ID card PVC dimensions.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">👨‍🏫 8. Teachers Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Teachers.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Teachers.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Faculty directory and teacher-subject assignment.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Single-Module Binding</strong>: Enforces business rule where each teacher profile is strictly associated with exactly <strong>1 subject module</strong> (e.g. Prof. Ahmed teaches Mathematics).</li>
+  <li style="margin-bottom: 4px;">Teacher creation & modification modal: Name, phone, email, assigned course module, photo upload.</li>
+  <li style="margin-bottom: 4px;">Course filter to view teachers by module.</li>
+  <li style="margin-bottom: 4px;">Teacher status toggles (Active / Inactive / Archived).</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">📚 9. Courses & Groups Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Courses.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Courses.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Subject module repository, group builder, and timetable recurring schedule planner.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Subject Module Management</strong>: Create/Edit courses (Arabic Name, French Name, Default Monthly Price, Description).</li>
+  <li style="margin-bottom: 4px;"><strong>Group Management</strong>:</li>
+  <li style="margin-bottom: 4px;">Create study groups under specific courses and assigned teachers.</li>
+  <li style="margin-bottom: 4px;">Set custom monthly price, student capacity limit, start/end dates, and classroom room number.</li>
+  <li style="margin-bottom: 4px;"><strong>Weekly Timetable Builder</strong>: Add recurring weekly timetable slots (Weekday, Start Time, End Time, Room).</li>
+  <li style="margin-bottom: 4px;"><strong>Extra Session Scheduler</strong>: Schedule one-off extra sessions with custom prices or free sessions.</li>
+  <li style="margin-bottom: 4px;"><strong>Session Cancellation Engine</strong>: Cancel scheduled sessions with automatic voiding of attendance records and financial refunds to enrolled students.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">⏱️ 10. Attendance Terminal Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Attendance.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Attendance.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Live session roster and barcode/QR scanner terminal.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Live QR Reader Engine</strong>: Supports USB hardware barcode scanners and webcam scanning.</li>
+  <li style="margin-bottom: 4px;"><strong>Instant Audio Feedback</strong>: Success beep for valid check-ins, error beep for inactive/unregistered cards.</li>
+  <li style="margin-bottom: 4px;"><strong>Manual Lookup</strong>: Instant search by student matricule or partial student name.</li>
+  <li style="margin-bottom: 4px;"><strong>Session Roster View</strong>: Real-time roster table displaying all enrolled students for the active session.</li>
+  <li style="margin-bottom: 4px;"><strong>Attendance Status Controls</strong>: One-click toggles for <strong>Present</strong>, <strong>Late</strong>, <strong>Absent</strong>, and <strong>Not Active</strong>.</li>
+  <li style="margin-bottom: 4px;"><strong>Instant Debt Warnings</strong>: Displays alert badge if scanned student is in debt or has 0 remaining sessions.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">📜 11. Attendance History Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/AttendanceHistory.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/AttendanceHistory.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Historical audit log of completed attendance sessions.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">Date range filtering and group filter.</li>
+  <li style="margin-bottom: 4px;">Session statistics: Present percentage, total absent students, completed sessions.</li>
+  <li style="margin-bottom: 4px;">Export capabilities for historical attendance logs.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">💳 12. Payments Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Payments.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Payments.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Financial cashier terminal for tuition collection and receipt issuance.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;"><strong>Payment Processing</strong>: Record tuition payments per student enrollment with automated receipt number generation (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">REC-XXXX</code>).</li>
+  <li style="margin-bottom: 4px;"><strong>Billing Period Selection</strong>: Associate payments with specific billing months (<code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">YYYY-MM</code>).</li>
+  <li style="margin-bottom: 4px;"><strong>Payment Methods</strong>: Cash, Bank Transfer, CCP.</li>
+  <li style="margin-bottom: 4px;"><strong>Printable Payment Receipts</strong>: Modal dialog rendering official school payment receipts with printable formatting.</li>
+  <li style="margin-bottom: 4px;"><strong>Payment Cancellation / Voiding</strong>: Cancel payments with automatic balance adjustment.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">📈 13. Reports Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Reports.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Reports.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Executive analytics and business intelligence dashboard.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">Financial revenue charts (Monthly income breakdown, payment method distribution).</li>
+  <li style="margin-bottom: 4px;">Outstanding Debt Overview: Detailed breakdown of students in debt per course module.</li>
+  <li style="margin-bottom: 4px;">Enrolled Students Distribution: Group and course popularity statistics.</li>
+  <li style="margin-bottom: 4px;">Attendance rate metrics across groups.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">⚙️ 14. Settings Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Settings.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Settings.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: System configuration, security settings, and branding setup.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">School Profile Details: Arabic/French school names, phone, address, tax ID.</li>
+  <li style="margin-bottom: 4px;">Branding Assets: Upload school logo for reports and identity cards.</li>
+  <li style="margin-bottom: 4px;">Language Selection: Dynamic switching between <strong>Arabic</strong>, <strong>French</strong>, and <strong>English</strong>.</li>
+  <li style="margin-bottom: 4px;">Security Settings: Change admin password and PIN code.</li>
+  <li style="margin-bottom: 4px;">Auto-Lock Timeout: Configure idle lock timer duration.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h3 style="color: #0F172A; font-family: Calibri, Arial, sans-serif; font-size: 14pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">💾 15. Backups Page</h3></p>
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/pages/Backups.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/pages/Backups.tsx</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Purpose</strong>: Database protection and disaster recovery hub.</li>
+  <li style="margin-bottom: 4px;"><strong>Key Features</strong>:</li>
+  <li style="margin-bottom: 4px;">Automated & Manual SQLite Database Backups.</li>
+  <li style="margin-bottom: 4px;">Export backup archives to <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">.zip</code> files.</li>
+  <li style="margin-bottom: 4px;">One-click Database Restoration with safe connection reloading.</li>
+  <li style="margin-bottom: 4px;">Backup history list with timestamps and file sizes.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">🛠️ 4. Shared Components & Layout Elements</h2></p>
+
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/components/layout/AppLayout.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/components/layout/AppLayout.tsx</code></a>: Root layout wrapper with Sidebar and Header.</li>
+  <li style="margin-bottom: 4px;"><a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/components/layout/Sidebar.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/components/layout/Sidebar.tsx</code></a>: Primary navigation bar with badge counters and active route highlights.</li>
+  <li style="margin-bottom: 4px;"><a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/components/layout/Header.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/components/layout/Header.tsx</code></a>: Top bar with quick search, language switcher, auto-lock lock button, and current user avatar.</li>
+  <li style="margin-bottom: 4px;"><a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/components/AutoLock.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/components/AutoLock.tsx</code></a>: Inactivity timer monitor locking application interface on idle timeout.</li>
+  <li style="margin-bottom: 4px;"><a href="file:///d:/Projects/school-management-Desktop-app/src/renderer/components/Logo.tsx" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">src/renderer/components/Logo.tsx</code></a>: Branding logo component rendering Edupilot DZ emblem.</li>
+</ul>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">🔌 5. Main Process Services & IPC Channels</h2></p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <tr style="background-color: #1E3A8A; color: #FFFFFF; font-weight: bold;">
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Service File</th>
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Primary Responsibilities</th>
+    <th style="border: 1px solid #CBD5E1; padding: 8px 12px; text-align: left;">Handled IPC Channels</th>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/attendance.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Attendance marking, session creation, roster, session audit log</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance:startSession</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance:scan</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance:markManually</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance:getSession</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">attendance:studentSessionHistory</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/student.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">student.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Student CRUD, hierarchical filtering, QR regeneration</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:getById</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:create</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:update</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:archive</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">students:regenQR</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/payment.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payment.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Financial balances, receipt generation, tuition payments</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments:create</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments:balance</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments:byStudent</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">payments:cancel</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/entities.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">entities.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Teachers, Courses, Groups CRUD & group schedule generation</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">teachers:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">teachers:create</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">courses:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">courses:create</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groups:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">groups:create</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/auth.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">auth.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Authentication, password hashing (Argon2), PIN code check</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">auth:login</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">auth:checkPin</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">auth:logout</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">auth:setup</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/backup.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">backup.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">SQLite database backup generation & restoration</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">backups:list</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">backups:create</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">backups:restore</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">backups:delete</code></td>
+  </tr>
+  <tr style="background-color: #FFFFFF;">
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><a href="file:///d:/Projects/school-management-Desktop-app/src/main/services/settings.service.ts" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">settings.service.ts</code></a></td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;">Application key-value configuration storage</td>
+    <td style="border: 1px solid #CBD5E1; padding: 8px 12px; color: #334155;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">settings:get</code>, <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">settings:update</code></td>
+  </tr>
+</table>
+
+
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+
+<p style="color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 6px 0;"><h2 style="color: #1E40AF; font-family: Calibri, Arial, sans-serif; font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #E2E8F0; padding-bottom: 4pt;">📦 6. Packaging & Deployment</h2></p>
+
+<ul style="margin: 8px 0; padding-left: 24px; color: #334155; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">
+  <li style="margin-bottom: 4px;"><strong>Config File</strong>: <a href="file:///d:/Projects/school-management-Desktop-app/electron-builder.yml" style="color: #2563EB; text-decoration: underline;"><code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">electron-builder.yml</code></a></li>
+  <li style="margin-bottom: 4px;"><strong>Target Output</strong>: <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">release/EdupilotDZ-Setup-1.0.0.exe</code></li>
+  <li style="margin-bottom: 4px;"><strong>Build Command</strong>: <code style="background-color: #F1F5F9; color: #0F172A; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 10pt;">npm run dist:win</code> (Executes Vite production build and packages NSIS installer).</li>
+</ul>
+
+
+</body>
+</html>
