@@ -6,6 +6,7 @@ import {
   BookOpen, AlertCircle, CreditCard, ChevronDown, Filter
 } from 'lucide-react'
 import schoolLogo from '../assets/school-logo-cropped.png'
+import QRCode from 'qrcode'
 import type { Payment, Student, Enrollment, Group, Course, SchoolSettings } from '@shared/types/index'
 
 interface PaymentSummary {
@@ -235,6 +236,8 @@ export default function Payments() {
   const [courses, setCourses] = useState<Course[]>([])
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [receiptModal, setReceiptModal] = useState<any | null>(null)
+  const [receiptQrDataUrl, setReceiptQrDataUrl] = useState<string | null>(null)
+  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
 
   // Transfer/Refund modals
@@ -257,24 +260,69 @@ export default function Payments() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [listRes, summaryRes, grpRes, crsRes, setRes] = await Promise.all([
+      const [listRes, summaryRes, grpRes, crsRes, setRes, stuRes] = await Promise.all([
         window.schoolApp.payments.list({ pageSize: 100 }),
         window.schoolApp.payments.summary(),
         window.schoolApp.groups.list(),
         window.schoolApp.courses.list(),
         window.schoolApp.settings.get(),
+        window.schoolApp.students.list({ pageSize: 1000 }),
       ])
       if (listRes.success && listRes.data) setPayments(listRes.data.items)
       if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data)
       if (grpRes.success && grpRes.data) setGroups(grpRes.data)
       if (crsRes.success && crsRes.data) setCourses(crsRes.data)
       if (setRes?.success && setRes.data) setSchoolSettings(setRes.data)
+      if (stuRes?.success && stuRes.data) setStudents(stuRes.data.items ?? [])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // ── QR Code generation and photo loading for Payment Receipt Ticket ──
+  useEffect(() => {
+    if (!receiptModal) {
+      setReceiptQrDataUrl(null)
+      setReceiptPhotoUrl(null)
+      return
+    }
+
+    const schoolTitle = schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت'
+    const qrLines = [
+      schoolTitle,
+      `Reçu: ${receiptModal.receiptNumber || ''}`,
+      receiptModal.studentName ? `Élève: ${receiptModal.studentName}` : null,
+      receiptModal.studentNumber ? `Matricule: ${receiptModal.studentNumber}` : null,
+      receiptModal.courseName || receiptModal.groupName ? `Groupe: ${[receiptModal.courseName, receiptModal.groupName].filter(Boolean).join(' ')}` : null,
+      `Montant: ${receiptModal.amount} DA`,
+      `Date: ${receiptModal.paymentDate || ''}`,
+    ].filter(Boolean)
+
+    QRCode.toDataURL(qrLines.join('\n'), {
+      width: 240,
+      margin: 1,
+      color: { dark: '#000000', light: '#FFFFFF' },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => setReceiptQrDataUrl(url))
+      .catch((err) => console.error('Payment QR error:', err))
+
+    // Find student to load photo if available
+    const sid = receiptModal.studentId
+    const s = students.find((item) => item.id === sid || String(item.id) === String(sid))
+    if (s?.photoPath) {
+      window.schoolApp.media.getImageUrl(s.photoPath)
+        .then((res) => {
+          if (res.success && res.data?.url) setReceiptPhotoUrl(res.data.url)
+          else setReceiptPhotoUrl(null)
+        })
+        .catch(() => setReceiptPhotoUrl(null))
+    } else {
+      setReceiptPhotoUrl(null)
+    }
+  }, [receiptModal, students, schoolSettings])
 
   // ── Auto-open form with pre-selected student when navigating from StudentProfile ──
   // Store the preselected ID from URL so we can open the form after load() finishes
@@ -739,85 +787,135 @@ export default function Payments() {
         </div>
       )}
 
-      {/* Print-only Payment Receipt — centered for 80mm thermal printers */}
+      {/* ── Compact 80mm Thermal Receipt Component (Ink & Paper Saver) ── */}
+      {(() => null)()}
+
+      {/* Print-only Payment Receipt — full-roll 80mm compatibility (72mm printable width, zero margin) */}
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          .payment-receipt-print,
-          .payment-receipt-print * { visibility: visible !important; }
-          .payment-receipt-print {
-            position: absolute !important;
-            left: 50% !important;
-            top: 5mm !important;
-            transform: translateX(-50%) !important;
+          html, body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 80mm !important;
+            background: #ffffff !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .payment-receipt-print,
+          .payment-receipt-print * {
+            visibility: visible !important;
+          }
+          .payment-receipt-print {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            width: 72mm !important;
+            display: block !important;
           }
           @page {
-            size: auto;
-            margin: 0;
+            size: 80mm auto;
+            margin: 0mm;
           }
         }
       `}</style>
 
-      {/* Hidden print area */}
-      {receiptModal && (
-        <div className="payment-receipt-print" style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+      {/* Shared Receipt Component logic */}
+      {receiptModal && (() => {
+        const modalStudent = students.find((s) => s.id === receiptModal.studentId || String(s.id) === String(receiptModal.studentId))
+        const modalStudentInitials = modalStudent
+          ? (modalStudent.firstNameAr ? `${modalStudent.firstNameAr.charAt(0)}${modalStudent.lastNameAr ? ' ' + modalStudent.lastNameAr.charAt(0) : ''}` : `${modalStudent.firstNameFr?.charAt(0) || ''}${modalStudent.lastNameFr?.charAt(0) || ''}`)
+          : (receiptModal.studentName?.charAt(0) || 'ط')
+
+        const schoolFrClean = schoolSettings?.schoolNameFr && !/edupilot/i.test(schoolSettings.schoolNameFr)
+          ? schoolSettings.schoolNameFr
+          : ''
+
+        const renderTicket = () => (
           <div
+            className="payment-receipt-content"
             style={{
-              width: '80mm',
+              width: '72mm',
               fontFamily: "'Courier New', Courier, monospace",
               backgroundColor: '#ffffff',
               color: '#000000',
-              padding: '6mm 5mm',
+              padding: '2mm 1mm',
               boxSizing: 'border-box',
               margin: '0 auto',
+              WebkitFontSmoothing: 'antialiased',
             }}
           >
             {/* Header: School Logo & name */}
-            <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5mm' }}>
               <img
                 src={schoolLogo}
                 alt="Logo"
-                style={{ width: '48mm', height: 'auto', display: 'block', margin: '0 auto 2mm' }}
+                style={{ width: '28mm', height: 'auto', display: 'block', margin: '0 auto 1mm', imageRendering: 'crisp-edges' }}
               />
-              <div style={{ fontSize: '11pt', fontWeight: 'bold', direction: 'rtl' }}>
+              <div style={{ fontSize: '9.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', lineHeight: '1.2' }}>
                 {schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
               </div>
-              {schoolSettings?.schoolNameFr && (
-                <div style={{ fontSize: '8pt', color: '#444', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
-                  {schoolSettings.schoolNameFr}
+              {schoolFrClean && (
+                <div style={{ fontSize: '7.5pt', fontWeight: 'bold', color: '#000000', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
+                  {schoolFrClean}
                 </div>
               )}
-              <div style={{ fontSize: '7pt', color: '#555', marginTop: '1mm', direction: 'rtl' }}>
+              <div style={{ fontSize: '6.5pt', color: '#000000', fontWeight: '600', marginTop: '0.5mm', direction: 'rtl' }}>
                 دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
               </div>
-              <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                {lang === 'ar' ? 'إيصال دفع' : 'REÇU DE PAIEMENT'}
+              <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
+              <div style={{ fontSize: '8.5pt', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#000000' }}>
+                ✦ {lang === 'ar' ? 'وصل تسديد رسوم' : 'REÇU DE PAIEMENT'} ✦
               </div>
-              <div style={{ fontSize: '8pt', color: '#555' }}>N° {receiptModal.receiptNumber}</div>
-              <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+              <div style={{ fontSize: '7.5pt', fontWeight: 'bold', color: '#000000' }}>
+                N° {receiptModal.receiptNumber}
+              </div>
+              <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
             </div>
 
-            {/* Receipt Details */}
-            <div style={{ fontSize: '8pt', lineHeight: '1.7' }}>
+            {/* Student Logo / Avatar Circle & Identity */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5mm' }}>
+              <div style={{
+                width: '15mm',
+                height: '15mm',
+                borderRadius: '50%',
+                border: '1.5px solid #000000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                marginBottom: '1mm',
+                backgroundColor: '#ffffff',
+              }}>
+                {receiptPhotoUrl ? (
+                  <img src={receiptPhotoUrl} alt="Photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: '9pt', fontWeight: 'bold', color: '#000000' }}>
+                    {modalStudentInitials}
+                  </span>
+                )}
+              </div>
               {receiptModal.studentName && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 'bold' }}>الطالب:</span>
-                  <span style={{ fontWeight: 'bold', direction: 'rtl' }}>{receiptModal.studentName}</span>
+                <div style={{ fontSize: '10.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', textAlign: 'center', lineHeight: '1.2' }}>
+                  {receiptModal.studentName}
                 </div>
               )}
               {receiptModal.studentNumber && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>رقم القيد:</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{receiptModal.studentNumber}</span>
+                <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'monospace', color: '#000000', marginTop: '0.3mm' }}>
+                  Matricule: {receiptModal.studentNumber}
                 </div>
               )}
+            </div>
+
+            <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
+
+            {/* Receipt Details */}
+            <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
               {(receiptModal.courseName || receiptModal.groupName) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>الفوج / المادة:</span>
+                  <span style={{ fontWeight: 'bold' }}>الفوج / المادة:</span>
                   <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
                     {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
                     {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
@@ -825,143 +923,98 @@ export default function Payments() {
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>فترة الفوترة:</span>
-                <span>{receiptModal.billingPeriod}</span>
+                <span style={{ fontWeight: 'bold' }}>فترة الفوترة:</span>
+                <span style={{ fontWeight: 'bold' }}>{receiptModal.billingPeriod}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>طريقة الدفع:</span>
-                <span>{t(`payments.${receiptModal.paymentMethod}`)}</span>
+                <span style={{ fontWeight: 'bold' }}>طريقة الدفع:</span>
+                <span style={{ fontWeight: 'bold' }}>{t(`payments.${receiptModal.paymentMethod}`)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>التاريخ:</span>
-                <span>{receiptModal.paymentDate}</span>
+                <span style={{ fontWeight: 'bold' }}>تاريخ الدفع:</span>
+                <span style={{ fontWeight: 'bold' }}>{receiptModal.paymentDate}</span>
               </div>
               {receiptModal.reference && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>المرجع:</span>
-                  <span>{receiptModal.reference}</span>
+                  <span style={{ fontWeight: 'bold' }}>المرجع:</span>
+                  <span style={{ fontWeight: 'bold' }}>{receiptModal.reference}</span>
                 </div>
               )}
             </div>
 
-            <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+            <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
             {/* Total Amount */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11pt', fontWeight: 'bold' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5pt', fontWeight: 'bold', color: '#000000' }}>
               <span>المبلغ الإجمالي:</span>
-              <span>{receiptModal.amount.toLocaleString()} DA</span>
+              <span>{Number(receiptModal.amount).toLocaleString()} DA</span>
             </div>
 
-            <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+            <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
+
+            {/* Payment QR Code */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1mm', margin: '1.5mm 0' }}>
+              {receiptQrDataUrl ? (
+                <img
+                  src={receiptQrDataUrl}
+                  alt="QR Code"
+                  style={{ width: '25mm', height: '25mm', display: 'block', imageRendering: 'pixelated' }}
+                />
+              ) : (
+                <div style={{ width: '25mm', height: '25mm', border: '1px dashed #000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7pt', fontWeight: 'bold', color: '#000000' }}>
+                  QR Code
+                </div>
+              )}
+              <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000000', fontFamily: 'monospace', textAlign: 'center' }}>
+                Reçu N°: {receiptModal.receiptNumber}
+              </div>
+            </div>
+
+            <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
             {/* Footer */}
-            <div style={{ textAlign: 'center', fontSize: '7pt', color: '#666', lineHeight: '1.4' }}>
+            <div style={{ textAlign: 'center', fontSize: '6.5pt', fontWeight: 'bold', color: '#000000', lineHeight: '1.2' }}>
               <div>شكراً لثقتكم بمؤسستنا التعليمية</div>
               <div>Merci de votre confiance</div>
             </div>
           </div>
-        </div>
-      )}
+        )
 
-      {/* Receipt Ticket Modal */}
-      {receiptModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 no-print" onClick={() => setReceiptModal(null)}>
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-4">
-              <h3 className="font-bold text-[#0F172A]">{t('payments.receipt')}</h3>
-              <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        return (
+          <>
+            {/* Hidden print area for 80mm printer */}
+            <div className="payment-receipt-print" style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+              {renderTicket()}
             </div>
 
-            {/* Printable Ticket Receipt */}
-            <div className="space-y-3 text-xs text-slate-700 font-mono bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
-              <div className="text-center">
-                <img
-                  src={schoolLogo}
-                  alt="Logo"
-                  className="w-36 mx-auto mb-2 rounded-md"
-                />
-                <p className="font-extrabold text-sm text-[#0F172A]" dir="rtl">
-                  {schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
-                </p>
-                {schoolSettings?.schoolNameFr && (
-                  <p className="text-[10px] text-slate-500 mt-0.5">{schoolSettings.schoolNameFr}</p>
-                )}
-                <p className="text-[9px] text-slate-400 mt-1" dir="rtl">
-                  دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
-                </p>
-                <div className="border-b border-dashed border-slate-300 my-2" />
-                <p className="font-bold text-xs text-[#0F172A] uppercase tracking-wider">
-                  {lang === 'ar' ? 'إيصال دفع' : 'REÇU DE PAIEMENT'}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{t('payments.receiptNumber')}: {receiptModal.receiptNumber}</p>
-              </div>
-
-              <div className="border-b border-dashed border-slate-300 my-2" />
-
-              {receiptModal.studentName && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t('payments.student')}:</span>
-                  <span className="font-bold text-[#0F172A] text-end">{receiptModal.studentName}</span>
+            {/* Receipt Modal Preview */}
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 no-print" onClick={() => setReceiptModal(null)}>
+              <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-fade-in flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-3 shrink-0">
+                  <h3 className="font-bold text-[#0F172A]">{t('payments.receipt')}</h3>
+                  <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X size={18} /></button>
                 </div>
-              )}
-              {receiptModal.studentNumber && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t('students.studentNumber')}:</span>
-                  <span className="font-bold text-slate-600">{receiptModal.studentNumber}</span>
+
+                {/* On-screen ticket preview showing exact same content as print */}
+                <div className="overflow-y-auto flex-1 bg-slate-100 p-3 rounded-xl flex justify-center border border-slate-200">
+                  <div className="bg-white shadow-md rounded-xs">
+                    {renderTicket()}
+                  </div>
                 </div>
-              )}
 
-              {(receiptModal.courseName || receiptModal.groupName) && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t('payments.courseAndGroup')}:</span>
-                  <span className="font-bold text-[#0F172A] text-end">
-                    {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
-                    {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
-                  </span>
+                <div className="flex justify-end gap-2 mt-4 shrink-0">
+                  <button
+                    onClick={handlePrintReceipt}
+                    className="w-full py-2.5 bg-[#2563EB] text-white rounded-lg text-xs font-bold hover:bg-[#1D4ED8] flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Printer size={15} /> {t('payments.printReceipt')}
+                  </button>
                 </div>
-              )}
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">{t('payments.billingPeriod')}:</span>
-                <span className="font-bold text-[#0F172A]">{receiptModal.billingPeriod}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">{t('payments.method')}:</span>
-                <span>{t(`payments.${receiptModal.paymentMethod}`)}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">{t('payments.date')}:</span>
-                <span>{receiptModal.paymentDate}</span>
-              </div>
-
-              {receiptModal.reference && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t('payments.reference')}:</span>
-                  <span className="font-semibold">{receiptModal.reference}</span>
-                </div>
-              )}
-
-              <div className="border-b border-dashed border-slate-300 my-2" />
-
-              <div className="flex justify-between items-center pt-1">
-                <span className="font-bold text-sm text-[#0F172A]">{t('payments.amount')}:</span>
-                <span className="font-extrabold text-base text-[#2563EB]">{receiptModal.amount.toLocaleString()} DA</span>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={handlePrintReceipt}
-                className="w-full py-2.5 bg-[#2563EB] text-white rounded-lg text-xs font-bold hover:bg-[#1D4ED8] flex items-center justify-center gap-2 shadow-xs transition-colors"
-              >
-                <Printer size={15} /> {t('payments.printReceipt')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )
+      })()}
 
       {/* Transfer Credit Modal */}
       {showTransfer && (

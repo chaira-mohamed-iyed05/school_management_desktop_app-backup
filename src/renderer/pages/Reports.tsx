@@ -131,10 +131,10 @@ export default function Reports() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[#0F172A]">
-              {schoolSettings?.schoolNameFr || 'EDUPILOT DZ'}
+              {(schoolSettings?.schoolNameFr && !/edupilot/i.test(schoolSettings.schoolNameFr)) ? schoolSettings.schoolNameFr : (schoolSettings?.schoolNameAr || '')}
             </h1>
             <p className="text-sm font-bold text-slate-700" dir="rtl">
-              {schoolSettings?.schoolNameAr || 'إدوبيلوت ديزاد'}
+              {schoolSettings?.schoolNameAr || ''}
             </p>
             {schoolSettings?.address && (
               <p className="text-xs text-slate-500 mt-1">{schoolSettings.address}</p>

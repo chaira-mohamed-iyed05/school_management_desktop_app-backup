@@ -51,9 +51,11 @@ export default function StudentCard() {
         }
 
         if (settingsRes.success && settingsRes.data) {
+          const rawFr = settingsRes.data.schoolNameFr ?? ''
+          const cleanFr = /edupilot/i.test(rawFr) ? '' : rawFr
           setSchool({
             schoolNameAr: settingsRes.data.schoolNameAr ?? '',
-            schoolNameFr: settingsRes.data.schoolNameFr ?? 'EDUPILOT DZ',
+            schoolNameFr: cleanFr,
             academicYear: settingsRes.data.academicYear ?? '2025-2026',
             phone: settingsRes.data.phone,
             address: settingsRes.data.address,
@@ -86,11 +88,12 @@ export default function StudentCard() {
         .map(e => `${e.courseName || 'Cours'}${e.groupName ? ` (${e.groupName})` : ''}${e.teacherName ? ` - ${e.teacherName}` : ''}`)
 
       // Clean structured plain text card — instantly readable by smartphones and QR scanners
+      const schoolLabel = school.schoolNameFr || school.schoolNameAr || 'ECOLE'
       const lines = [
-        school.schoolNameFr || 'EDUPILOT DZ',
+        schoolLabel,
         `Matricule: ${student.studentNumber}`,
         `Nom: ${fullNameAr}`,
-        `Nom FR: ${fullNameFr}`,
+        fullNameFr ? `Nom FR: ${fullNameFr}` : null,
         student.phone ? `Tél: ${student.phone}` : null,
         classesSummary.length > 0 ? `Classes: ${classesSummary.join(', ')}` : null,
         `ID: ${student.qrToken}`,
@@ -99,7 +102,7 @@ export default function StudentCard() {
       const qrPayload = lines.join('\n')
 
       QRCode.toDataURL(qrPayload, {
-        width: 320,
+        width: 240,
         margin: 1,
         color: { dark: '#000000', light: '#FFFFFF' },
         errorCorrectionLevel: 'M',
@@ -144,66 +147,75 @@ export default function StudentCard() {
     return <div className="text-center py-20 text-slate-400">{t('errors.STUDENT_NOT_FOUND')}</div>
   }
 
-  /* ── 80mm Thermal Ticket Component ── */
+  /* ── 80mm Thermal Ticket Component (Compact, Ink & Paper Saver) ── */
   const TicketContent = () => (
     <div
       className="student-ticket-content"
       style={{
-        width: '80mm',
+        width: '72mm',
         fontFamily: "'Courier New', Courier, monospace",
         backgroundColor: '#ffffff',
         color: '#000000',
-        padding: '6mm 5mm',
+        padding: '2mm 1mm',
         boxSizing: 'border-box',
         margin: '0 auto',
+        WebkitFontSmoothing: 'antialiased',
       }}
     >
       {/* Header: School Logo & name */}
-      <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1.5mm' }}>
         <img
           src={schoolLogo}
           alt="Logo"
-          style={{ width: '48mm', height: 'auto', display: 'block', margin: '0 auto 2mm' }}
+          style={{ width: '28mm', height: 'auto', display: 'block', margin: '0 auto 1mm', imageRendering: 'crisp-edges' }}
         />
-        <div style={{ fontSize: '11pt', fontWeight: 'bold', direction: 'rtl' }}>
+        <div style={{ fontSize: '9.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', lineHeight: '1.2' }}>
           {school.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
         </div>
         {school.schoolNameFr && (
-          <div style={{ fontSize: '8pt', color: '#444', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
+          <div style={{ fontSize: '7.5pt', fontWeight: 'bold', color: '#000000', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
             {school.schoolNameFr}
           </div>
         )}
-        <div style={{ fontSize: '7pt', color: '#555', marginTop: '1mm', direction: 'rtl' }}>
+        <div style={{ fontSize: '6.5pt', color: '#000000', fontWeight: '600', marginTop: '0.5mm', direction: 'rtl' }}>
           دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
         </div>
-        <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
-        <div style={{ fontSize: '10pt', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>
-          TICKET ÉTUDIANT
+        <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
+        <div style={{ fontSize: '8.5pt', fontWeight: 'bold', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#000000' }}>
+          ✦ TICKET ÉTUDIANT ✦
         </div>
-        <div style={{ fontSize: '8pt', color: '#555' }}>Année scolaire: {school.academicYear}</div>
-        <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+        <div style={{ fontSize: '7pt', fontWeight: 'bold', color: '#000000' }}>
+          Année: {school.academicYear}
+        </div>
+        <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
       </div>
 
-      {/* Photo / Initials */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3mm' }}>
+      {/* Photo / Initials Circle (Compact 15mm) */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5mm' }}>
         {photoUrl ? (
           <img
             src={photoUrl}
             alt="Photo"
             style={{
-              width: '22mm',
-              height: '22mm',
+              width: '15mm',
+              height: '15mm',
               borderRadius: '50%',
               objectFit: 'cover',
-              border: '2px solid #000',
+              border: '1.5px solid #000000',
             }}
           />
         ) : (
           <div style={{
-            width: '22mm', height: '22mm', borderRadius: '50%',
-            border: '2px solid #000', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: '13pt', fontWeight: 'bold',
+            width: '15mm',
+            height: '15mm',
+            borderRadius: '50%',
+            border: '1.5px solid #000000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '9pt',
+            fontWeight: 'bold',
+            color: '#000000',
           }}>
             {initials}
           </div>
@@ -211,15 +223,21 @@ export default function StudentCard() {
       </div>
 
       {/* Student Names */}
-      <div style={{ textAlign: 'center', marginBottom: '2.5mm' }}>
-        <div style={{ fontSize: '12pt', fontWeight: 'bold', direction: 'rtl' }}>{fullNameAr}</div>
-        <div style={{ fontSize: '9.5pt', color: '#222', marginTop: '1mm' }}>{fullNameFr}</div>
+      <div style={{ textAlign: 'center', marginBottom: '1.5mm' }}>
+        <div style={{ fontSize: '10.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', lineHeight: '1.2' }}>
+          {fullNameAr}
+        </div>
+        {fullNameFr && (
+          <div style={{ fontSize: '8pt', fontWeight: 'bold', color: '#000000', marginTop: '0.5mm' }}>
+            {fullNameFr}
+          </div>
+        )}
       </div>
 
-      <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+      <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
       {/* Student Identity Details */}
-      <div style={{ fontSize: '8pt', lineHeight: '1.6' }}>
+      <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontWeight: 'bold' }}>N° Matricule:</span>
           <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{student.studentNumber}</span>
@@ -227,7 +245,7 @@ export default function StudentCard() {
         {student.phone && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 'bold' }}>Téléphone:</span>
-            <span>{student.phone}</span>
+            <span style={{ fontWeight: 'bold' }}>{student.phone}</span>
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -236,60 +254,59 @@ export default function StudentCard() {
         </div>
       </div>
 
-      <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+      <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
       {/* Course & Group Enrollment Details with Teacher */}
-      <div style={{ fontSize: '8pt', lineHeight: '1.6' }}>
-        <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '1.5mm' }}>
+      <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
+        <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '1mm' }}>
           CLASSES & ENSEIGNANTS:
         </div>
         {activeEnrollments.length > 0 ? (
           activeEnrollments.map((en, idx) => (
-            <div key={en.id || idx} style={{ marginBottom: '2mm', paddingBottom: '1.5mm', borderBottom: idx < activeEnrollments.length - 1 ? '1px dotted #ccc' : 'none' }}>
+            <div key={en.id || idx} style={{ marginBottom: '1mm', paddingBottom: '1mm', borderBottom: idx < activeEnrollments.length - 1 ? '1px dashed #000000' : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                 <span>• Matière:</span>
                 <span style={{ direction: 'rtl' }}>{en.courseName || en.groupName || '—'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#444' }}>  Groupe:</span>
-                <span>{en.groupName || `Groupe #${en.groupId}`}</span>
+                <span style={{ fontWeight: 'bold' }}>  Groupe:</span>
+                <span style={{ fontWeight: 'bold' }}>{en.groupName || `Groupe #${en.groupId}`}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#444' }}>  Enseignant:</span>
+                <span style={{ fontWeight: 'bold' }}>  Enseignant:</span>
                 <span style={{ fontWeight: 'bold' }}>{en.teacherName || 'Non assigné'}</span>
               </div>
             </div>
           ))
         ) : (
-          <div style={{ color: '#666', fontStyle: 'italic' }}>Aucune inscription active</div>
+          <div style={{ color: '#000000', fontWeight: 'bold', fontStyle: 'italic' }}>Aucune inscription active</div>
         )}
       </div>
 
+      <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
-      <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
-
-      {/* Rich QR Code Section */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5mm', margin: '2mm 0' }}>
+      {/* Rich QR Code Section (Compact 25mm to conserve paper) */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1mm', margin: '1.5mm 0' }}>
         {qrDataUrl ? (
           <img
             src={qrDataUrl}
             alt="QR Code"
-            style={{ width: '40mm', height: '40mm', display: 'block', imageRendering: 'pixelated' }}
+            style={{ width: '25mm', height: '25mm', display: 'block', imageRendering: 'pixelated' }}
           />
         ) : (
-          <div style={{ width: '40mm', height: '40mm', border: '1px dashed #999', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8pt', color: '#999' }}>
+          <div style={{ width: '25mm', height: '25mm', border: '1px dashed #000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7pt', fontWeight: 'bold', color: '#000000' }}>
             QR Code
           </div>
         )}
-        <div style={{ fontSize: '6.5pt', color: '#555', fontFamily: 'monospace', textAlign: 'center', wordBreak: 'break-all', maxWidth: '70mm' }}>
+        <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000000', fontFamily: 'monospace', textAlign: 'center', wordBreak: 'break-all', maxWidth: '70mm' }}>
           ID: {student.qrToken}
         </div>
       </div>
 
-      <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+      <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
 
       {/* Footer */}
-      <div style={{ textAlign: 'center', fontSize: '6.5pt', color: '#666', lineHeight: '1.4' }}>
+      <div style={{ textAlign: 'center', fontSize: '6pt', fontWeight: 'bold', color: '#000000', lineHeight: '1.2' }}>
         <div>Inscrit le: {student.registrationDate}</div>
         <div>Scannez ce QR Code pour voir le profil & pointer la présence</div>
       </div>
@@ -298,24 +315,34 @@ export default function StudentCard() {
 
   return (
     <>
-      {/* Print-only ticket — centered on page */}
+      {/* Print-only ticket — full-roll 80mm compatibility (72mm printable width, zero margin) */}
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          .student-ticket-print,
-          .student-ticket-print * { visibility: visible !important; }
-          .student-ticket-print {
-            position: absolute !important;
-            left: 50% !important;
-            top: 5mm !important;
-            transform: translateX(-50%) !important;
+          html, body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 80mm !important;
+            background: #ffffff !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .student-ticket-print,
+          .student-ticket-print * {
+            visibility: visible !important;
+          }
+          .student-ticket-print {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            width: 72mm !important;
+            display: block !important;
           }
           @page {
-            size: auto;
-            margin: 0;
+            size: 80mm auto;
+            margin: 0mm;
           }
         }
       `}</style>
@@ -369,7 +396,7 @@ export default function StudentCard() {
               <img
                 src={schoolLogo}
                 alt="Logo"
-                className="w-36 mx-auto mb-2.5 rounded-lg"
+                className="w-24 mx-auto mb-2 rounded-lg"
               />
               <p className="text-base font-extrabold text-[#0F172A]" dir="rtl">
                 {school.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
