@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Printer, Download, Eye } from 'lucide-react'
 import QRCode from 'qrcode'
+import schoolLogo from '../assets/school-logo-cropped.png'
 import type { Student, Enrollment } from '@shared/types/index'
 
 interface SchoolInfo {
@@ -18,7 +19,7 @@ export default function StudentCard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [student, setStudent] = useState<Student | null>(null)
-  const [school, setSchool] = useState<SchoolInfo>({ schoolNameAr: '', schoolNameFr: 'EDUPILOT DZ', academicYear: '2025-2026' })
+  const [school, setSchool] = useState<SchoolInfo>({ schoolNameAr: 'مدرسة المعيار الثابت للغات', schoolNameFr: 'EL MIYAR EL THABIT', academicYear: '2025-2026' })
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -157,16 +158,24 @@ export default function StudentCard() {
         margin: '0 auto',
       }}
     >
-      {/* Header: School name */}
+      {/* Header: School Logo & name */}
       <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
-        <div style={{ fontSize: '11pt', fontWeight: 'bold', letterSpacing: '1px' }}>
-          {school.schoolNameFr || 'EDUPILOT DZ'}
+        <img
+          src={schoolLogo}
+          alt="Logo"
+          style={{ width: '48mm', height: 'auto', display: 'block', margin: '0 auto 2mm' }}
+        />
+        <div style={{ fontSize: '11pt', fontWeight: 'bold', direction: 'rtl' }}>
+          {school.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
         </div>
-        {school.schoolNameAr && (
-          <div style={{ fontSize: '10pt', fontWeight: 'bold', direction: 'rtl', marginTop: '1mm' }}>
-            {school.schoolNameAr}
+        {school.schoolNameFr && (
+          <div style={{ fontSize: '8pt', color: '#444', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
+            {school.schoolNameFr}
           </div>
         )}
+        <div style={{ fontSize: '7pt', color: '#555', marginTop: '1mm', direction: 'rtl' }}>
+          دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
+        </div>
         <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
         <div style={{ fontSize: '10pt', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>
           TICKET ÉTUDIANT
@@ -355,14 +364,24 @@ export default function StudentCard() {
           <div className="h-2 bg-linear-to-r from-[#2563EB] to-[#06B6D4]" />
 
           <div className="p-6">
-            {/* School name */}
+            {/* School logo & name */}
             <div className="text-center mb-4">
-              <p className="text-[10px] font-bold tracking-[3px] text-slate-400 uppercase mb-1">
-                {school.schoolNameFr || 'EDUPILOT DZ'}
+              <img
+                src={schoolLogo}
+                alt="Logo"
+                className="w-36 mx-auto mb-2.5 rounded-lg"
+              />
+              <p className="text-base font-extrabold text-[#0F172A]" dir="rtl">
+                {school.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
               </p>
-              {school.schoolNameAr && (
-                <p className="text-sm font-bold text-[#0F172A]" dir="rtl">{school.schoolNameAr}</p>
+              {school.schoolNameFr && (
+                <p className="text-[10px] font-bold tracking-[1.5px] text-slate-400 uppercase mt-0.5">
+                  {school.schoolNameFr}
+                </p>
               )}
+              <p className="text-[9px] text-slate-500 mt-1" dir="rtl">
+                دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
+              </p>
               <div className="border-b border-dashed border-slate-300 my-2.5" />
               <p className="text-xs font-bold tracking-[2px] text-[#0F172A] uppercase">TICKET ÉTUDIANT</p>
               <p className="text-[10px] text-slate-400 mt-0.5">Année scolaire: {school.academicYear}</p>

@@ -63,7 +63,7 @@ export interface StudentTicketProps {
   forPrint?: boolean
 }
 
-export default function StudentTicket({ student, courseName, groupName, schoolName = "إيدوبيلوت الجزائر", academicYear = "2025-2026", photoUrl, forPrint = false }: StudentTicketProps) {
+export default function StudentTicket({ student, courseName, groupName, schoolName = "مدرسة المعيار الثابت للغات", academicYear = "2025-2026", photoUrl, forPrint = false }: StudentTicketProps) {
   const fullNameAr = `${student.lastNameAr || student.lastNameFr || ''} ${student.firstNameAr || student.firstNameFr || ''}`.trim()
   const fullNameFr = `${student.firstNameFr} ${student.lastNameFr}`.trim()
   const isActive = student.status === "active"

@@ -5,7 +5,8 @@ import {
   Plus, Search, Printer, X, TrendingUp, AlertTriangle, CheckCircle2, Clock,
   BookOpen, AlertCircle, CreditCard, ChevronDown, Filter
 } from 'lucide-react'
-import type { Payment, Student, Enrollment, Group, Course } from '@shared/types/index'
+import schoolLogo from '../assets/school-logo-cropped.png'
+import type { Payment, Student, Enrollment, Group, Course, SchoolSettings } from '@shared/types/index'
 
 interface PaymentSummary {
   monthRevenue: number
@@ -234,6 +235,7 @@ export default function Payments() {
   const [courses, setCourses] = useState<Course[]>([])
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [receiptModal, setReceiptModal] = useState<any | null>(null)
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
 
   // Transfer/Refund modals
   const [showTransfer, setShowTransfer] = useState<{ enrollmentId: number; studentId: number; balance: number } | null>(null)
@@ -255,16 +257,18 @@ export default function Payments() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [listRes, summaryRes, grpRes, crsRes] = await Promise.all([
+      const [listRes, summaryRes, grpRes, crsRes, setRes] = await Promise.all([
         window.schoolApp.payments.list({ pageSize: 100 }),
         window.schoolApp.payments.summary(),
         window.schoolApp.groups.list(),
         window.schoolApp.courses.list(),
+        window.schoolApp.settings.get(),
       ])
       if (listRes.success && listRes.data) setPayments(listRes.data.items)
       if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data)
       if (grpRes.success && grpRes.data) setGroups(grpRes.data)
       if (crsRes.success && crsRes.data) setCourses(crsRes.data)
+      if (setRes?.success && setRes.data) setSchoolSettings(setRes.data)
     } finally {
       setLoading(false)
     }
@@ -380,7 +384,20 @@ export default function Payments() {
         notes: form.notes.trim() || null,
       })
       if (!res.success) { setError(res.error ?? t('common.error')) }
-      else { setShowForm(false); setReceiptModal(res.data); await load() }
+      else {
+        setShowForm(false)
+        const selectedStudent = students.find((s) => s.id === Number(form.studentId))
+        const selectedEnr = enrollments.find((e) => e.id === finalEnrollmentId)
+        const enrichedReceipt = {
+          ...res.data,
+          studentName: selectedStudent ? getStudentLabel(selectedStudent) : res.data?.studentName,
+          studentNumber: selectedStudent?.studentNumber ?? res.data?.studentNumber,
+          groupName: selectedEnr?.groupName ?? res.data?.groupName,
+          courseName: selectedEnr?.courseName ?? res.data?.courseName,
+        }
+        setReceiptModal(enrichedReceipt)
+        await load()
+      }
     } catch (err: any) { setError(err?.message ?? t('common.error')) }
     finally { setSaving(false) }
   }
@@ -722,9 +739,133 @@ export default function Payments() {
         </div>
       )}
 
+      {/* Print-only Payment Receipt — centered for 80mm thermal printers */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .payment-receipt-print,
+          .payment-receipt-print * { visibility: visible !important; }
+          .payment-receipt-print {
+            position: absolute !important;
+            left: 50% !important;
+            top: 5mm !important;
+            transform: translateX(-50%) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm !important;
+          }
+          @page {
+            size: auto;
+            margin: 0;
+          }
+        }
+      `}</style>
+
+      {/* Hidden print area */}
+      {receiptModal && (
+        <div className="payment-receipt-print" style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+          <div
+            style={{
+              width: '80mm',
+              fontFamily: "'Courier New', Courier, monospace",
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              padding: '6mm 5mm',
+              boxSizing: 'border-box',
+              margin: '0 auto',
+            }}
+          >
+            {/* Header: School Logo & name */}
+            <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
+              <img
+                src={schoolLogo}
+                alt="Logo"
+                style={{ width: '48mm', height: 'auto', display: 'block', margin: '0 auto 2mm' }}
+              />
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', direction: 'rtl' }}>
+                {schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
+              </div>
+              {schoolSettings?.schoolNameFr && (
+                <div style={{ fontSize: '8pt', color: '#444', letterSpacing: '0.5px', marginTop: '0.5mm' }}>
+                  {schoolSettings.schoolNameFr}
+                </div>
+              )}
+              <div style={{ fontSize: '7pt', color: '#555', marginTop: '1mm', direction: 'rtl' }}>
+                دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
+              </div>
+              <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+              <div style={{ fontSize: '10pt', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>
+                {lang === 'ar' ? 'إيصال دفع' : 'REÇU DE PAIEMENT'}
+              </div>
+              <div style={{ fontSize: '8pt', color: '#555' }}>N° {receiptModal.receiptNumber}</div>
+              <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+            </div>
+
+            {/* Receipt Details */}
+            <div style={{ fontSize: '8pt', lineHeight: '1.7' }}>
+              {receiptModal.studentName && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 'bold' }}>الطالب:</span>
+                  <span style={{ fontWeight: 'bold', direction: 'rtl' }}>{receiptModal.studentName}</span>
+                </div>
+              )}
+              {receiptModal.studentNumber && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>رقم القيد:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{receiptModal.studentNumber}</span>
+                </div>
+              )}
+              {(receiptModal.courseName || receiptModal.groupName) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>الفوج / المادة:</span>
+                  <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
+                    {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
+                    {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
+                  </span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>فترة الفوترة:</span>
+                <span>{receiptModal.billingPeriod}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>طريقة الدفع:</span>
+                <span>{t(`payments.${receiptModal.paymentMethod}`)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>التاريخ:</span>
+                <span>{receiptModal.paymentDate}</span>
+              </div>
+              {receiptModal.reference && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>المرجع:</span>
+                  <span>{receiptModal.reference}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+
+            {/* Total Amount */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11pt', fontWeight: 'bold' }}>
+              <span>المبلغ الإجمالي:</span>
+              <span>{receiptModal.amount.toLocaleString()} DA</span>
+            </div>
+
+            <div style={{ borderBottom: '1px dashed #000', margin: '2.5mm 0' }} />
+
+            {/* Footer */}
+            <div style={{ textAlign: 'center', fontSize: '7pt', color: '#666', lineHeight: '1.4' }}>
+              <div>شكراً لثقتكم بمؤسستنا التعليمية</div>
+              <div>Merci de votre confiance</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Receipt Ticket Modal */}
       {receiptModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setReceiptModal(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 no-print" onClick={() => setReceiptModal(null)}>
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-4">
               <h3 className="font-bold text-[#0F172A]">{t('payments.receipt')}</h3>
@@ -734,7 +875,24 @@ export default function Payments() {
             {/* Printable Ticket Receipt */}
             <div className="space-y-3 text-xs text-slate-700 font-mono bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
               <div className="text-center">
-                <p className="font-extrabold text-base text-[#0F172A] tracking-wider">EDUPILOT DZ</p>
+                <img
+                  src={schoolLogo}
+                  alt="Logo"
+                  className="w-36 mx-auto mb-2 rounded-md"
+                />
+                <p className="font-extrabold text-sm text-[#0F172A]" dir="rtl">
+                  {schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت للغات'}
+                </p>
+                {schoolSettings?.schoolNameFr && (
+                  <p className="text-[10px] text-slate-500 mt-0.5">{schoolSettings.schoolNameFr}</p>
+                )}
+                <p className="text-[9px] text-slate-400 mt-1" dir="rtl">
+                  دروس دعم — تمهيدي — ابتدائي — متوسط — ثانوي
+                </p>
+                <div className="border-b border-dashed border-slate-300 my-2" />
+                <p className="font-bold text-xs text-[#0F172A] uppercase tracking-wider">
+                  {lang === 'ar' ? 'إيصال دفع' : 'REÇU DE PAIEMENT'}
+                </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">{t('payments.receiptNumber')}: {receiptModal.receiptNumber}</p>
               </div>
 
