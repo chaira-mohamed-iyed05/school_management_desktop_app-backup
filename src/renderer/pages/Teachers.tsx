@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Pencil, Archive, Camera, RefreshCw, BookOpen, Filter } from 'lucide-react'
 import type { Teacher, Course } from '@shared/types/index'
 import { getCourseName } from '../utils/format'
+import { useConfirm } from '../components/feedback/DialogProvider'
 
 function TeacherAvatar({ teacher, onUpload, title }: { teacher: Teacher; onUpload: () => void; title: string }) {
   const [url, setUrl] = useState<string | null>(null)
@@ -38,6 +39,7 @@ function TeacherAvatar({ teacher, onUpload, title }: { teacher: Teacher; onUploa
 export default function Teachers() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
+  const confirm = useConfirm()
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,7 +122,13 @@ export default function Teachers() {
   }
 
   const handleArchive = async (id: number) => {
-    if (!window.confirm(t('teachers.archiveConfirm'))) return
+    const ok = await confirm({
+      title: t('teachers.archive'),
+      message: t('teachers.archiveConfirm'),
+      variant: 'danger',
+      confirmText: t('teachers.archive'),
+    })
+    if (!ok) return
     await window.schoolApp.teachers.archive(id)
     await load()
   }
@@ -134,7 +142,12 @@ export default function Teachers() {
   }
 
   const handleRestore = async (id: number) => {
-    if (!window.confirm(t('teachers.restoreConfirm'))) return
+    const ok = await confirm({
+      title: t('teachers.restore'),
+      message: t('teachers.restoreConfirm'),
+      variant: 'info',
+    })
+    if (!ok) return
     await window.schoolApp.teachers.update(id, { status: 'active' } as any)
     await load()
   }

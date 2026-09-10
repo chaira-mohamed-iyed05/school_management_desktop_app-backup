@@ -5,7 +5,7 @@ import { useAuth } from '../features/auth/AuthContext'
 import {
   Save, School, Wrench, Database, Shield,
   Eye, EyeOff, CheckCircle2, AlertCircle, FolderOpen,
-  RotateCcw, Plus, Clock, User, KeyRound
+  RotateCcw, Plus, Clock, User, KeyRound, X
 } from 'lucide-react'
 import type { SchoolSettings } from '@shared/types/index'
 
@@ -52,6 +52,9 @@ export default function Settings() {
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [restoreModalPath, setRestoreModalPath] = useState<string | null>(null)
+  const [restorePassword, setRestorePassword] = useState('')
+  const [restoreError, setRestoreError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -182,17 +185,25 @@ export default function Settings() {
   const handleRestoreBackup = async () => {
     const res = await window.schoolApp.app.openBackupDialog()
     if (!res.success || !res.data || res.data.canceled || !res.data.path) return
-    const confirmPw = window.prompt(t('backups.passwordConfirm'))
-    if (!confirmPw) return
+    setRestoreModalPath(res.data.path)
+    setRestorePassword('')
+    setRestoreError('')
+  }
+
+  const handleConfirmRestore = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!restoreModalPath || !restorePassword) return
     setRestoring(true)
+    setRestoreError('')
     try {
-      const restoreRes = await window.schoolApp.backups.restore(res.data.path, confirmPw)
+      const restoreRes = await window.schoolApp.backups.restore(restoreModalPath, restorePassword)
       if (restoreRes.success) {
+        setRestoreModalPath(null)
         alert(t('backups.restoreComplete'))
         await logout()
         navigate('/login', { replace: true })
       } else {
-        alert(`${t('common.error')}: ${restoreRes.error}`)
+        setRestoreError(restoreRes.error || t('common.error'))
       }
     } finally {
       setRestoring(false)
@@ -590,6 +601,68 @@ export default function Settings() {
           </div>
         )}
       </div>
+
+      {/* Restore Backup Password Confirmation Modal */}
+      {restoreModalPath && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => !restoring && setRestoreModalPath(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-base text-[#0F172A]">{t('backups.restore')}</h3>
+              <button
+                type="button"
+                onClick={() => !restoring && setRestoreModalPath(null)}
+                disabled={restoring}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmRestore} className="space-y-4">
+              <p className="text-xs text-slate-500">{t('backups.passwordConfirm')}</p>
+              <div>
+                <input
+                  type="password"
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                  placeholder="******"
+                  className={inputCls}
+                  autoFocus
+                  disabled={restoring}
+                />
+              </div>
+
+              {restoreError && (
+                <p className="text-xs text-red-600 font-medium">{restoreError}</p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setRestoreModalPath(null)}
+                  disabled={restoring}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={restoring || !restorePassword}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {restoring ? t('common.saving') : t('common.confirm')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

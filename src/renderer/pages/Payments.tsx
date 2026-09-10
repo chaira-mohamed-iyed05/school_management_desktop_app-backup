@@ -8,6 +8,7 @@ import {
 import schoolLogo from '../assets/school-logo-cropped.png'
 import QRCode from 'qrcode'
 import type { Payment, Student, Enrollment, Group, Course, SchoolSettings } from '@shared/types/index'
+import { useConfirm } from '../components/feedback/DialogProvider'
 
 interface PaymentSummary {
   monthRevenue: number
@@ -220,6 +221,7 @@ export default function Payments() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language as 'ar' | 'fr' | 'en'
   const location = useLocation()
+  const confirm = useConfirm()
 
   const [payments, setPayments] = useState<any[]>([])
   const [summary, setSummary] = useState<PaymentSummary>({ monthRevenue: 0, todayCollected: 0, outstanding: 0, overdue: 0 })
@@ -471,7 +473,13 @@ export default function Payments() {
   }
 
   const handleCancel = async (id: number) => {
-    if (!window.confirm(t('payments.cancelConfirm'))) return
+    const ok = await confirm({
+      title: t('payments.cancel'),
+      message: t('payments.cancelConfirm'),
+      variant: 'danger',
+      confirmText: t('common.confirm'),
+    })
+    if (!ok) return
     await window.schoolApp.payments.cancel(id)
     await load()
   }

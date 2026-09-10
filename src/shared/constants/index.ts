@@ -164,4 +164,5 @@ export const IPC_CHANNELS = {
   APP_PRINT_TO_PDF: 'app:printToPdf',
   APP_SHOW_SAVE_DIALOG: 'app:showSaveDialog',
   APP_LOG_ERROR: 'app:logError',
+  APP_REFOCUS: 'app:refocus',
 } as const

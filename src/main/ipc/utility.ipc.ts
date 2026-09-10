@@ -191,25 +191,51 @@ export function registerUtilityHandlers(): void {
 
   // File dialogs (main process only — never let renderer specify arbitrary paths)
   handle(IPC_CHANNELS.APP_OPEN_BACKUP_DIALOG, async () => {
+    const { BrowserWindow } = await import('electron')
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     // Pre-navigate to the backups folder so non-technical users can find their backups
     const settings = await getSettings()
     const defaultBackupDir = settings?.backupDirectory ?? path.join(app.getPath('userData'), 'backups')
 
-    const result = await dialog.showOpenDialog({
+    const dialogOpts = {
       title: 'Sélectionner le fichier de sauvegarde',
       defaultPath: defaultBackupDir,
       filters: [{ name: 'Backup Files', extensions: ['zip'] }],
-      properties: ['openFile'],
-    })
+      properties: ['openFile'] as ('openFile')[],
+    }
+
+    const result = win && !win.isDestroyed()
+      ? await dialog.showOpenDialog(win, dialogOpts)
+      : await dialog.showOpenDialog(dialogOpts)
+
+    if (win && !win.isDestroyed()) {
+      win.blur()
+      win.focus()
+      win.webContents.focus()
+    }
+
     if (result.canceled) return { canceled: true, path: null }
     return { canceled: false, path: result.filePaths[0] ?? null }
   })
 
   handle(IPC_CHANNELS.APP_SHOW_SAVE_DIALOG, async () => {
-    const result = await dialog.showOpenDialog({
+    const { BrowserWindow } = await import('electron')
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    const dialogOpts = {
       title: 'Sélectionner le dossier de destination',
-      properties: ['openDirectory', 'createDirectory'],
-    })
+      properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
+    }
+
+    const result = win && !win.isDestroyed()
+      ? await dialog.showOpenDialog(win, dialogOpts)
+      : await dialog.showOpenDialog(dialogOpts)
+
+    if (win && !win.isDestroyed()) {
+      win.blur()
+      win.focus()
+      win.webContents.focus()
+    }
+
     if (result.canceled) return { canceled: true, path: null }
     return { canceled: false, path: result.filePaths[0] ?? null }
   })
@@ -217,9 +243,17 @@ export function registerUtilityHandlers(): void {
   // Print
   handle(IPC_CHANNELS.APP_PRINT, async () => {
     const { BrowserWindow } = await import('electron')
-    const win = BrowserWindow.getFocusedWindow()
-    if (win) {
-      win.webContents.print({ silent: false, printBackground: true })
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) {
+      win.webContents.print({ silent: false, printBackground: true }, () => {
+        setTimeout(() => {
+          if (win && !win.isDestroyed()) {
+            win.blur()
+            win.focus()
+            win.webContents.focus()
+          }
+        }, 150)
+      })
     }
     return true
   })
@@ -229,7 +263,7 @@ export function registerUtilityHandlers(): void {
     const { BrowserWindow, dialog: dlg } = await import('electron')
     const fs = await import('fs/promises')
     const path = await import('path')
-    const win = BrowserWindow.getFocusedWindow()
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     if (!win) throw new Error('No focused window')
 
     const opts = (payload ?? {}) as { pageSize?: 'A4' | 'Letter'; marginsType?: 0 | 1 | 2; filename?: string }
@@ -251,6 +285,12 @@ export function registerUtilityHandlers(): void {
       defaultPath,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
     })
+
+    if (win && !win.isDestroyed()) {
+      win.blur()
+      win.focus()
+      win.webContents.focus()
+    }
 
     if (saveResult.canceled || !saveResult.filePath) {
       return { path: null, canceled: true }
@@ -274,6 +314,18 @@ export function registerUtilityHandlers(): void {
       message: data.message ?? 'Unknown renderer error',
       stack: data.componentStack,
     })
+    return true
+  })
+
+  // Refocus handler to restore OS focus to the window and webContents
+  handle(IPC_CHANNELS.APP_REFOCUS, async () => {
+    const { BrowserWindow } = await import('electron')
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) {
+      win.blur()
+      win.focus()
+      win.webContents.focus()
+    }
     return true
   })
 }

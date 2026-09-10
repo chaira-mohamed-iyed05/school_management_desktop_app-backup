@@ -309,6 +309,7 @@ const api = {
     printToPdf: (opts?: { pageSize?: 'A4' | 'Letter'; marginsType?: 0 | 1 | 2; filename?: string }) => invoke<{ path: string }>(IPC_CHANNELS.APP_PRINT_TO_PDF, opts),
     logError: (details: { category?: string; message?: string; componentStack?: string }) =>
       invoke<boolean>(IPC_CHANNELS.APP_LOG_ERROR, details),
+    refocus: () => invoke<boolean>(IPC_CHANNELS.APP_REFOCUS),
   },
 } as const
 

@@ -10,6 +10,7 @@ import {
 import type { Student, Payment, Group, Course, Teacher } from '@shared/types/index'
 import { getCourseName, formatCurrency } from '../utils/format'
 import QRCode from 'qrcode'
+import { useConfirm, useToast } from '../components/feedback/DialogProvider'
 
 // Convert Eastern Arabic numerals (٠-٩) and Persian numerals (۰-۹) to standard ASCII (0-9)
 function normalizeNumberInput(val: string): string {
@@ -148,6 +149,8 @@ export default function StudentProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
   const lang = i18n.language as 'ar' | 'fr' | 'en'
+  const confirm = useConfirm()
+  const toast = useToast()
 
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
@@ -476,21 +479,37 @@ export default function StudentProfile() {
 
   const handleRegenQR = async () => {
     if (!student) return
-    if (!window.confirm(t('students.regenQRConfirm'))) return
+    const ok = await confirm({
+      title: t('students.regenQR'),
+      message: t('students.regenQRConfirm'),
+      variant: 'warning',
+    })
+    if (!ok) return
     const res = await window.schoolApp.students.regenQR(student.id)
     if (res.success) await load()
   }
 
   const handleArchive = async () => {
     if (!student) return
-    if (!window.confirm(t('students.archiveConfirm'))) return
+    const ok = await confirm({
+      title: t('students.archive'),
+      message: t('students.archiveConfirm'),
+      variant: 'danger',
+      confirmText: t('students.archive'),
+    })
+    if (!ok) return
     await window.schoolApp.students.archive(student.id)
     navigate('/students')
   }
 
   const handleRestore = async () => {
     if (!student) return
-    if (!window.confirm(t('students.restoreConfirm') || 'Restaurer cet étudiant ?')) return
+    const ok = await confirm({
+      title: t('students.restore'),
+      message: t('students.restoreConfirm') || 'Restaurer cet étudiant ?',
+      variant: 'info',
+    })
+    if (!ok) return
     await window.schoolApp.students.update(student.id, { status: 'active' } as any)
     await window.schoolApp.students.regenQR(student.id)
     await load()
@@ -512,7 +531,12 @@ export default function StudentProfile() {
     const confirmMsg = nextStatus === 'inactive'
       ? t('students.suspendConfirm')
       : t('students.reactivateConfirm')
-    if (!window.confirm(confirmMsg)) return
+    const ok = await confirm({
+      title: nextStatus === 'inactive' ? t('students.suspend') : t('students.reactivate'),
+      message: confirmMsg,
+      variant: nextStatus === 'inactive' ? 'warning' : 'info',
+    })
+    if (!ok) return
 
     await window.schoolApp.enrollments.update(enrollId, { status: nextStatus })
     if (student) await loadEnrollmentsWithBalances(student.id)
@@ -539,7 +563,13 @@ export default function StudentProfile() {
     const confirmMsg = bal > 0
       ? `${t('students.cancelEnrollmentConfirm')} (${t('payments.refund')}: ${bal.toLocaleString()} DA)`
       : t('students.cancelEnrollmentConfirm')
-    if (!window.confirm(confirmMsg)) return
+    const ok = await confirm({
+      title: t('students.cancelEnrollment'),
+      message: confirmMsg,
+      variant: 'danger',
+      confirmText: t('common.confirm'),
+    })
+    if (!ok) return
 
     try {
       const res = await window.schoolApp.enrollments.cancel(enroll.id, student.id)
@@ -681,7 +711,12 @@ export default function StudentProfile() {
   }
 
   const handleDeleteNote = async (noteId: number) => {
-    if (!window.confirm(t('students.deleteNoteConfirm') || 'Are you sure you want to delete this note?')) return
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: t('students.deleteNoteConfirm') || 'Are you sure you want to delete this note?',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       const res = await window.schoolApp.notes.delete(noteId)
       if (res.success) {

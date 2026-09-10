@@ -92,6 +92,12 @@ export function registerMediaHandlers() {
         properties: ['openFile'],
       })
 
+      if (parentWindow && !parentWindow.isDestroyed()) {
+        parentWindow.blur()
+        parentWindow.focus()
+        parentWindow.webContents.focus()
+      }
+
       if (result.canceled || result.filePaths.length === 0) {
         return { success: false, data: null, error: 'Selection cancelled' }
       }

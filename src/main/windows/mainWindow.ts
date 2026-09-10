@@ -69,9 +69,18 @@ export function createMainWindow(): BrowserWindow {
   // Show window gracefully after paint
   win.once('ready-to-show', () => {
     win.show()
+    win.webContents.focus()
     if (process.env.NODE_ENV === 'development' && process.env.OPEN_DEVTOOLS === 'true') {
       win.webContents.openDevTools({ mode: 'detach' })
     }
+  })
+
+  // Ensure Chromium webContents always receives OS focus on Windows
+  win.on('focus', () => {
+    win.webContents.focus()
+  })
+  win.on('restore', () => {
+    win.webContents.focus()
   })
 
   // Apply strict Content Security Policy

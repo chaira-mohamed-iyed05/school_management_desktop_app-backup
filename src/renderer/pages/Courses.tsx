@@ -6,6 +6,7 @@ import {
   Trash2, X, BookOpen, DollarSign, Users, ExternalLink, UserMinus, Search
 } from 'lucide-react'
 import type { Course, Group, Teacher } from '@shared/types/index'
+import { useConfirm } from '../components/feedback/DialogProvider'
 
 interface ScheduleSlot {
   id: number
@@ -42,6 +43,7 @@ const Modal = ({ title, onClose, children }: { title: string; onClose: () => voi
 export default function Courses() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language as 'ar' | 'fr' | 'en'
+  const confirm = useConfirm()
 
   const getWeekdayLabel = (day: typeof WEEKDAYS[0]) => {
     if (lang === 'ar') return day.ar
@@ -248,7 +250,12 @@ export default function Courses() {
   }
 
   const handleDeleteSlot = async (slotId: number) => {
-    if (!window.confirm(t('courses.deleteSlotConfirm'))) return
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: t('courses.deleteSlotConfirm'),
+      variant: 'danger',
+    })
+    if (!ok) return
     await window.schoolApp.schedules.delete(slotId)
     await loadData()
   }
@@ -393,7 +400,12 @@ export default function Courses() {
     const confirmMsg = lang === 'ar'
       ? `هل أنت متأكد من إلغاء تسجيل الطالب "${studentName}" من هذا الفوج؟`
       : `Voulez-vous vraiment désinscrire l'étudiant "${studentName}" de ce groupe ?`
-    if (!window.confirm(confirmMsg)) return
+    const ok = await confirm({
+      title: lang === 'ar' ? 'إلغاء التسجيل' : 'Désinscrire',
+      message: confirmMsg,
+      variant: 'danger',
+    })
+    if (!ok) return
 
     try {
       const res = await window.schoolApp.enrollments.update(enrollmentId, { status: 'inactive' })
@@ -415,7 +427,12 @@ export default function Courses() {
     const msg = lang === 'ar'
       ? `هل أنت متأكد من حذف مادة "${courseName}" وجميع أفواجها وحصصها؟`
       : `Êtes-vous sûr de vouloir supprimer le cours "${courseName}" et tous ses groupes ?`
-    if (!window.confirm(msg)) return
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: msg,
+      variant: 'danger',
+    })
+    if (!ok) return
     await window.schoolApp.courses.delete(courseId)
     await loadData()
   }
@@ -424,7 +441,12 @@ export default function Courses() {
     const msg = lang === 'ar'
       ? `هل أنت متأكد من حذف فوج "${groupName}"؟`
       : `Êtes-vous sûr de vouloir supprimer le groupe "${groupName}" ?`
-    if (!window.confirm(msg)) return
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: msg,
+      variant: 'danger',
+    })
+    if (!ok) return
     await window.schoolApp.groups.delete(groupId)
     if (selectedGroup?.id === groupId) setSelectedGroup(null)
     await loadData()
