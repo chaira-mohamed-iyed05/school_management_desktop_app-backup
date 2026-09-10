@@ -102,21 +102,35 @@ export async function listStudents(opts: {
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
   const query = `
+    WITH enr_bals AS (
+      SELECT
+        p.student_id,
+        p.enrollment_id,
+        SUM(
+          CASE
+            WHEN p.payment_type IN ('credit', 'payment', 'top_up', 'transfer_in', 'credit_transfer_in', 'session_refund') THEN p.amount
+            WHEN p.payment_type = 'refund' AND p.session_id IS NOT NULL THEN p.amount
+            WHEN p.payment_type = 'refund' AND p.session_id IS NULL THEN -p.amount
+            WHEN p.payment_type IN ('deduction', 'session_charge', 'transfer_out', 'credit_transfer_out', 'enrollment_refund') THEN -p.amount
+            ELSE 0
+          END
+        ) as bal
+      FROM payments p
+      WHERE p.status = 'paid'
+      GROUP BY p.student_id, p.enrollment_id
+    )
     SELECT
       s.*,
       COALESCE((
-        SELECT SUM(
-          CASE
-            WHEN payment_type IN ('credit', 'payment', 'top_up', 'transfer_in', 'credit_transfer_in', 'session_refund') THEN amount
-            WHEN payment_type = 'refund' AND session_id IS NOT NULL THEN amount
-            WHEN payment_type = 'refund' AND session_id IS NULL THEN -amount
-            WHEN payment_type IN ('deduction', 'session_charge', 'transfer_out', 'credit_transfer_out', 'enrollment_refund') THEN -amount
-            ELSE 0
-          END
-        )
-        FROM payments p
-        WHERE p.student_id = s.id AND p.status = 'paid'
-      ), 0) as net_balance,
+        SELECT SUM(ABS(bal))
+        FROM enr_bals
+        WHERE student_id = s.id AND bal < 0
+      ), 0) as total_debt,
+      COALESCE((
+        SELECT SUM(bal)
+        FROM enr_bals
+        WHERE student_id = s.id AND bal > 0
+      ), 0) as total_credit,
       (
         SELECT GROUP_CONCAT(g.name, ', ')
         FROM enrollments e
@@ -132,20 +146,29 @@ export async function listStudents(opts: {
 
   // Filter by paymentStatus if requested
   if (opts.status === 'paid') {
-    allMatchedRows = allMatchedRows.filter(r => (r.net_balance ?? 0) >= 0 && r.status !== 'archived')
+    allMatchedRows = allMatchedRows.filter(r => (r.total_debt ?? 0) === 0 && r.status !== 'archived')
   } else if (opts.status === 'in_debt') {
-    allMatchedRows = allMatchedRows.filter(r => (r.net_balance ?? 0) < 0 && r.status !== 'archived')
+    allMatchedRows = allMatchedRows.filter(r => (r.total_debt ?? 0) > 0 && r.status !== 'archived')
   }
 
   const total = allMatchedRows.length
   const pagedRows = allMatchedRows.slice(offset, offset + pageSize)
 
-  const items = pagedRows.map(r => ({
-    ...mapRow(r),
-    netBalance: r.net_balance ?? 0,
-    paymentStatus: (r.net_balance ?? 0) >= 0 ? 'paid' : 'in_debt',
-    groupNames: r.group_names ?? '',
-  }))
+  const items = pagedRows.map(r => {
+    const totalDebt = r.total_debt ?? 0
+    const totalCredit = r.total_credit ?? 0
+    const hasDebt = totalDebt > 0
+    const netBalance = hasDebt ? -totalDebt : totalCredit
+
+    return {
+      ...mapRow(r),
+      netBalance,
+      totalDebt,
+      totalCredit,
+      paymentStatus: hasDebt ? 'in_debt' : 'paid',
+      groupNames: r.group_names ?? '',
+    }
+  })
 
   return {
     items: items as any[],

@@ -97,6 +97,8 @@ export async function getEnrollmentBalance(enrollmentId: number): Promise<{
 export async function getStudentBalance(studentId: number): Promise<{
   studentId: number
   totalBalance: number
+  totalDebt: number
+  totalCredit: number
   isDebt: boolean
   enrollmentBalances: Array<{
     enrollmentId: number
@@ -121,12 +123,17 @@ export async function getStudentBalance(studentId: number): Promise<{
     ORDER BY e.created_at DESC
   `).all(studentId) as any[]
 
-  let totalBalance = 0
+  let totalDebt = 0
+  let totalCredit = 0
   const enrollmentBalances = []
 
   for (const enr of enrollments) {
     const bal = await getEnrollmentBalance(enr.enrollment_id)
-    totalBalance += bal.balance
+    if (bal.balance < 0) {
+      totalDebt += Math.abs(bal.balance)
+    } else if (bal.balance > 0) {
+      totalCredit += bal.balance
+    }
     enrollmentBalances.push({
       enrollmentId: enr.enrollment_id,
       groupId: enr.group_id,
@@ -139,11 +146,17 @@ export async function getStudentBalance(studentId: number): Promise<{
     })
   }
 
-  totalBalance = Math.round(totalBalance * 100) / 100
+  totalDebt = Math.round(totalDebt * 100) / 100
+  totalCredit = Math.round(totalCredit * 100) / 100
+  const hasDebt = totalDebt > 0
+  const totalBalance = hasDebt ? -totalDebt : totalCredit
+
   return {
     studentId,
     totalBalance,
-    isDebt: totalBalance < 0,
+    totalDebt,
+    totalCredit,
+    isDebt: hasDebt,
     enrollmentBalances,
   }
 }
@@ -767,9 +780,9 @@ export async function calculateStudentTuitionDebt(studentId: number): Promise<{
     })
   }
 
-  const netBalance = totalStudentPaid - totalStudentDue
-  const totalDebt = netBalance < 0 ? Math.abs(netBalance) : 0
-  const overallStatus = totalDebt > 0 ? 'overdue' : (netBalance > 0 ? 'advance' : 'up_to_date')
+  const totalDebt = enrollmentDetails.reduce((sum, e) => sum + (e.debt > 0 ? e.debt : 0), 0)
+  const totalAdvance = enrollmentDetails.reduce((sum, e) => sum + (e.balance > 0 ? e.balance : 0), 0)
+  const overallStatus = totalDebt > 0 ? 'overdue' : (totalAdvance > 0 ? 'advance' : 'up_to_date')
   const maxMonthsOverdue = enrollmentDetails.reduce((max, e) => Math.max(max, e.monthsOverdue), 0)
 
   return {

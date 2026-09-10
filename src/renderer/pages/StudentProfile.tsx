@@ -716,9 +716,12 @@ export default function StudentProfile() {
     { key: 'notes', label: t('common.notes') },
   ]
 
-  // Net student debt across active enrollments
-  const totalNetBalance = enrollments.reduce((acc, e) => acc + (e.balance ?? 0), 0)
-  const isStudentInDebt = totalNetBalance < 0
+  // Debt & credit calculation across enrollments:
+  // If student has debt in ANY enrollment, sum all debts so student is marked in debt.
+  // If not in debt (totalDebt === 0), show total positive credits.
+  const totalDebt = enrollments.reduce((acc, e) => acc + ((e.balance ?? 0) < 0 ? Math.abs(e.balance ?? 0) : 0), 0)
+  const totalCredit = enrollments.reduce((acc, e) => acc + ((e.balance ?? 0) > 0 ? (e.balance ?? 0) : 0), 0)
+  const isStudentInDebt = totalDebt > 0
 
   return (
     <div className="animate-fade-in space-y-5">
@@ -776,15 +779,15 @@ export default function StudentProfile() {
 
                 {/* Overall Debt/Payment Status Badge */}
                 <div className="flex gap-2 justify-center mt-2.5 flex-wrap">
-                  {totalNetBalance < 0 ? (
+                  {isStudentInDebt ? (
                     <span className="text-xs px-3 py-1 rounded-full font-bold bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 shadow-2xs">
                       <AlertCircle size={12} />
-                      {t('students.inDebtWithAmount', { amount: Math.abs(totalNetBalance).toLocaleString() })}
+                      {t('students.inDebtWithAmount', { amount: totalDebt.toLocaleString() })}
                     </span>
-                  ) : totalNetBalance > 0 ? (
+                  ) : totalCredit > 0 ? (
                     <span className="text-xs px-3 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
                       <CheckCircle2 size={12} />
-                      {t('students.positiveBalance', { amount: totalNetBalance.toLocaleString() })}
+                      {t('students.positiveBalance', { amount: totalCredit.toLocaleString() })}
                     </span>
                   ) : (
                     <span className="text-xs px-3 py-1 rounded-full font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1 shadow-2xs">
