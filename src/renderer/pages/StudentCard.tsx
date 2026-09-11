@@ -190,38 +190,6 @@ export default function StudentCard() {
         <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
       </div>
 
-      {/* Photo / Initials Circle (Compact 15mm) */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5mm' }}>
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt="Photo"
-            style={{
-              width: '15mm',
-              height: '15mm',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '1.5px solid #000000',
-            }}
-          />
-        ) : (
-          <div style={{
-            width: '15mm',
-            height: '15mm',
-            borderRadius: '50%',
-            border: '1.5px solid #000000',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '9pt',
-            fontWeight: 'bold',
-            color: '#000000',
-          }}>
-            {initials}
-          </div>
-        )}
-      </div>
-
       {/* Student Names */}
       <div style={{ textAlign: 'center', marginBottom: '1.5mm' }}>
         <div style={{ fontSize: '10.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', lineHeight: '1.2' }}>
@@ -232,26 +200,11 @@ export default function StudentCard() {
             {fullNameFr}
           </div>
         )}
-      </div>
-
-      <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
-
-      {/* Student Identity Details */}
-      <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 'bold' }}>N° Matricule:</span>
-          <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{student.studentNumber}</span>
-        </div>
         {student.phone && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 'bold' }}>Téléphone:</span>
-            <span style={{ fontWeight: 'bold' }}>{student.phone}</span>
+          <div style={{ fontSize: '7.5pt', fontWeight: 'bold', color: '#000000', marginTop: '0.5mm' }}>
+            Tél: {student.phone}
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 'bold' }}>Statut:</span>
-          <span style={{ fontWeight: 'bold' }}>{student.status === 'active' ? 'ACTIF' : 'INACTIF'}</span>
-        </div>
       </div>
 
       <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
@@ -414,40 +367,12 @@ export default function StudentCard() {
               <p className="text-[10px] text-slate-400 mt-0.5">Année scolaire: {school.academicYear}</p>
             </div>
 
-            {/* Photo */}
-            <div className="flex justify-center mb-3">
-              {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt={fullNameFr}
-                  className="w-20 h-20 rounded-full object-cover border-2 border-[#2563EB]"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-[#EFF6FF] border-2 border-[#2563EB] flex items-center justify-center text-[#2563EB] font-bold text-2xl">
-                  {initials}
-                </div>
-              )}
-            </div>
-
             {/* Names */}
             <div className="text-center mb-3">
               <p className="font-bold text-[#0F172A] text-base" dir="rtl">{fullNameAr}</p>
               <p className="text-slate-500 text-sm">{fullNameFr}</p>
-            </div>
-
-            <div className="border-b border-dashed border-slate-300 my-2.5" />
-
-            {/* Student details */}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">MATRICULE</span>
-                <span className="font-mono font-bold text-[#0F172A]">{student.studentNumber}</span>
-              </div>
               {student.phone && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">TÉLÉPHONE</span>
-                  <span className="font-medium text-[#0F172A] dir-ltr">{student.phone}</span>
-                </div>
+                <p className="text-xs font-semibold text-slate-700 mt-1">Tél: {student.phone}</p>
               )}
             </div>
 
