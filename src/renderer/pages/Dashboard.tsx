@@ -56,7 +56,7 @@ interface Stats {
   outstanding: number
 }
 
-const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+const HOURS = Array.from({ length: 24 }, (_, i) => i) // 00:00 to 23:00 (Full 24 hours)
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6]
 
 const COURSE_COLORS = [
