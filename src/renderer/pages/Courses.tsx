@@ -432,31 +432,60 @@ export default function Courses() {
 
   const handleDeleteCourse = async (courseId: number, courseName: string) => {
     const msg = lang === 'ar'
-      ? `هل أنت متأكد من حذف مادة "${courseName}" وجميع أفواجها وحصصها؟`
-      : `Êtes-vous sûr de vouloir supprimer le cours "${courseName}" et tous ses groupes ?`
+      ? `هل أنت متأكد من حذف مادة "${courseName}"؟ سيتم حذف جميع الأفواج التابعة لها وحصصها وجداولها وإلغاء تسجيلات طلابها تلقائياً وبأمان.`
+      : `Êtes-vous sûr de vouloir supprimer le cours "${courseName}" ainsi que tous ses groupes, séances et inscriptions en toute sécurité ?`
     const ok = await confirm({
       title: t('common.delete'),
       message: msg,
       variant: 'danger',
     })
     if (!ok) return
-    await window.schoolApp.courses.delete(courseId)
-    await loadData()
+
+    try {
+      const res = await window.schoolApp.courses.delete(courseId)
+      if (res && !res.success) {
+        alert(res.error || (lang === 'ar' ? 'فشل حذف المادة' : 'Échec de la suppression du cours'))
+        return
+      }
+      if (expandedCourse === courseId) setExpandedCourse(null)
+      if (showGroupModal === courseId) setShowGroupModal(null)
+      if (selectedGroup?.courseId === courseId) setSelectedGroup(null)
+      if (viewGroupStudents?.courseId === courseId) setViewGroupStudents(null)
+      if (editingGroup?.courseId === courseId) setEditingGroup(null)
+      if (showScheduleModal?.courseId === courseId) setShowScheduleModal(null)
+      if (showExtraSessionModal?.courseId === courseId) setShowExtraSessionModal(null)
+      await loadData()
+    } catch (err: any) {
+      alert(err.message || (lang === 'ar' ? 'حدث خطأ أثناء حذف المادة' : 'Erreur lors de la suppression du cours'))
+    }
   }
 
   const handleDeleteGroup = async (groupId: number, groupName: string) => {
     const msg = lang === 'ar'
-      ? `هل أنت متأكد من حذف فوج "${groupName}"؟`
-      : `Êtes-vous sûr de vouloir supprimer le groupe "${groupName}" ?`
+      ? `هل أنت متأكد من حذف فوج "${groupName}"؟ سيتم حذف جميع حصصه المسجلة وجداوله وإلغاء تسجيلات الطلاب تلقائياً وبأمان.`
+      : `Êtes-vous sûr de vouloir supprimer le groupe "${groupName}" ? Toutes ses séances, plannings et inscriptions seront supprimés en toute sécurité.`
     const ok = await confirm({
       title: t('common.delete'),
       message: msg,
       variant: 'danger',
     })
     if (!ok) return
-    await window.schoolApp.groups.delete(groupId)
-    if (selectedGroup?.id === groupId) setSelectedGroup(null)
-    await loadData()
+
+    try {
+      const res = await window.schoolApp.groups.delete(groupId)
+      if (res && !res.success) {
+        alert(res.error || (lang === 'ar' ? 'فشل حذف الفوج' : 'Échec de la suppression du groupe'))
+        return
+      }
+      if (selectedGroup?.id === groupId) setSelectedGroup(null)
+      if (viewGroupStudents?.id === groupId) setViewGroupStudents(null)
+      if (showScheduleModal?.id === groupId) setShowScheduleModal(null)
+      if (showExtraSessionModal?.id === groupId) setShowExtraSessionModal(null)
+      if (editingGroup?.id === groupId) setEditingGroup(null)
+      await loadData()
+    } catch (err: any) {
+      alert(err.message || (lang === 'ar' ? 'حدث خطأ أثناء حذف الفوج' : 'Erreur lors de la suppression du groupe'))
+    }
   }
 
   const inputCls = 'w-full px-3 py-2 border border-border rounded-lg text-sm focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 bg-white'

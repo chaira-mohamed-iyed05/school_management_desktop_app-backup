@@ -1,5 +1,5 @@
 import { eq, desc, count, and } from 'drizzle-orm'
-import { getDb, schema } from '../database/connection'
+import { getDb, getSqlite, schema } from '../database/connection'
 import { AppError, ErrorCode } from '../../shared/errors/index'
 import { requireSession } from './auth.service'
 import type { Teacher, Course, Group, Enrollment } from '../../shared/types/index'
@@ -170,15 +170,65 @@ export async function updateCourse(id: number, data: Partial<{ nameAr: string; n
   return { id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn, descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null, defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
 }
 
+/**
+ * Safely cascades the deletion of a group and all its related dependencies in strictly safe foreign-key order.
+ * Must be executed within a transaction.
+ */
+function cascadeDeleteGroupInternal(sqlite: any, groupId: number): void {
+  // 1. Delete all payments associated with this group (either via its enrollments or via its sessions)
+  sqlite.prepare(`
+    DELETE FROM payments 
+    WHERE enrollment_id IN (SELECT id FROM enrollments WHERE group_id = ?)
+       OR session_id IN (SELECT id FROM attendance_sessions WHERE group_id = ?)
+  `).run(groupId, groupId)
+
+  // 2. Delete all attendance records associated with sessions in this group
+  sqlite.prepare(`
+    DELETE FROM attendance_records 
+    WHERE session_id IN (SELECT id FROM attendance_sessions WHERE group_id = ?)
+  `).run(groupId)
+
+  // 3. Delete all attendance sessions for this group
+  sqlite.prepare(`
+    DELETE FROM attendance_sessions WHERE group_id = ?
+  `).run(groupId)
+
+  // 4. Delete all group schedule slots for this group
+  sqlite.prepare(`
+    DELETE FROM group_schedule_slots WHERE group_id = ?
+  `).run(groupId)
+
+  // 5. Delete all enrollments for this group
+  sqlite.prepare(`
+    DELETE FROM enrollments WHERE group_id = ?
+  `).run(groupId)
+
+  // 6. Delete the group itself
+  sqlite.prepare(`
+    DELETE FROM groups WHERE id = ?
+  `).run(groupId)
+}
+
 export async function deleteCourse(id: number): Promise<boolean> {
   requireSession()
-  const db = getDb()
-  const courseGroups = await db.query.groups.findMany({ where: eq(schema.groups.courseId, id) })
-  for (const g of courseGroups) {
-    await deleteGroup(g.id)
-  }
-  await db.delete(schema.courses).where(eq(schema.courses.id, id))
-  return true
+  const sqlite = getSqlite()
+
+  return sqlite.transaction(() => {
+    // 1. Unlink any teacher assigned to this course (teachers.course_id -> courses.id)
+    sqlite.prepare(`
+      UPDATE teachers SET course_id = NULL, updated_at = datetime('now') WHERE course_id = ?
+    `).run(id)
+
+    // 2. Find all groups under this course and safely delete each one
+    const childGroups = sqlite.prepare(`SELECT id FROM groups WHERE course_id = ?`).all(id) as { id: number }[]
+    for (const g of childGroups) {
+      cascadeDeleteGroupInternal(sqlite, g.id)
+    }
+
+    // 3. Finally delete the course
+    sqlite.prepare(`DELETE FROM courses WHERE id = ?`).run(id)
+    return true
+  })()
 }
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
@@ -226,32 +276,12 @@ export async function updateGroup(id: number, data: Partial<{ name: string; room
 
 export async function deleteGroup(id: number): Promise<boolean> {
   requireSession()
-  const db = getDb()
+  const sqlite = getSqlite()
 
-  // 1. Delete attendance records for all sessions in this group
-  const sessions = await db.query.attendanceSessions.findMany({ where: eq(schema.attendanceSessions.groupId, id) })
-  for (const s of sessions) {
-    await db.delete(schema.attendanceRecords).where(eq(schema.attendanceRecords.sessionId, s.id))
-  }
-
-  // 2. Delete attendance sessions in this group (breaks foreign key references to groupScheduleSlots and groups)
-  await db.delete(schema.attendanceSessions).where(eq(schema.attendanceSessions.groupId, id))
-
-  // 3. Delete group schedule slots (safe now that sessions referencing them are deleted)
-  await db.delete(schema.groupScheduleSlots).where(eq(schema.groupScheduleSlots.groupId, id))
-
-  // 4. Find all enrollments in this group and delete their associated payments
-  const groupEnrollments = await db.query.enrollments.findMany({ where: eq(schema.enrollments.groupId, id) })
-  for (const enr of groupEnrollments) {
-    await db.delete(schema.payments).where(eq(schema.payments.enrollmentId, enr.id))
-  }
-
-  // 5. Delete enrollments in this group (safe now that payments referencing them are deleted)
-  await db.delete(schema.enrollments).where(eq(schema.enrollments.groupId, id))
-
-  // 6. Finally delete the group
-  await db.delete(schema.groups).where(eq(schema.groups.id, id))
-  return true
+  return sqlite.transaction(() => {
+    cascadeDeleteGroupInternal(sqlite, id)
+    return true
+  })()
 }
 
 // ─── Enrollments ──────────────────────────────────────────────────────────────
