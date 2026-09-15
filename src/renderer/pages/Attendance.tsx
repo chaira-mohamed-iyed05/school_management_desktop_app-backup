@@ -374,9 +374,20 @@ function SmartScanner({ lang }: { lang: string }) {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-sm text-[#0F172A]">
-                          {lang === 'ar' ? (s.courseNameAr || s.courseNameFr) : (s.courseNameFr || s.courseNameAr)} — {s.groupName}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm text-[#0F172A]">
+                            {lang === 'ar' ? (s.courseNameAr || s.courseNameFr) : (s.courseNameFr || s.courseNameAr)} — {s.groupName}
+                          </p>
+                          {s.price === 0 ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🎁 {lang === 'ar' ? 'مجانية (0 د.ج)' : '0 DA'}
+                            </span>
+                          ) : s.price > 0 ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                              💰 {s.price.toLocaleString()} د.ج
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-slate-400">{s.plannedStartTime} – {s.endTime} {s.room ? `· ${s.room}` : ''}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -534,10 +545,34 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
           sessions.map(s => (
             <button key={s.id} onClick={() => loadRoster(s.id)}
               className={`w-full text-left bg-white rounded-xl border-2 p-4 transition-all hover:shadow-sm ${selectedSession === s.id ? 'border-[#2563EB] bg-blue-50' : 'border-border'}`}>
-              <p className="font-semibold text-sm text-[#0F172A]">
-                {lang === 'ar' ? (s.courseNameAr || s.courseNameFr) : (s.courseNameFr || s.courseNameAr)}
-              </p>
-              <p className="text-xs text-slate-500">{s.groupName} · {s.plannedStartTime}{s.endTime ? `–${s.endTime}` : ''}</p>
+              <div className="flex items-center justify-between gap-1">
+                <p className="font-semibold text-sm text-[#0F172A] truncate">
+                  {lang === 'ar' ? (s.courseNameAr || s.courseNameFr) : (s.courseNameFr || s.courseNameAr)}
+                </p>
+                {s.price === 0 ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                    🎁 {lang === 'ar' ? '0 د.ج (مجانية)' : '0 DA (Free)'}
+                  </span>
+                ) : s.price > 0 ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                    💰 {s.price.toLocaleString()} د.ج
+                  </span>
+                ) : s.monthlyPrice ? (
+                  <span className="text-[10px] font-semibold text-slate-600 px-1.5 py-0.5 bg-slate-100 rounded shrink-0">
+                    🏷️ {Math.round(s.monthlyPrice / 4).toLocaleString()} د.ج
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+                <span>{s.groupName}</span>
+                <span>·</span>
+                <span>{s.plannedStartTime}{s.endTime ? `–${s.endTime}` : ''}</span>
+                {s.sessionType === 'extra' && (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded">
+                    {lang === 'ar' ? 'إضافية' : 'Extra'}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{s.presentCount}/{s.enrolledCount}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
@@ -557,10 +592,39 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
           <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>
         ) : roster ? (
           <div className="bg-white rounded-xl border border-border overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
               <div>
-                <p className="font-bold text-sm text-[#0F172A]">{roster.session.groupName}</p>
-                <p className="text-xs text-slate-500">{roster.session.sessionDate} · {roster.session.plannedStartTime}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-sm text-[#0F172A]">{roster.session.groupName}</p>
+                  {roster.session.price === 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                      <span>🎁</span>
+                      <span>{lang === 'ar' ? 'مجانية (اقتطاع: 0 د.ج)' : lang === 'en' ? 'Free (0 DA)' : 'Gratuite (0 DA)'}</span>
+                    </span>
+                  ) : roster.session.price > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                      <span>💰</span>
+                      <span>{lang === 'ar' ? `اقتطاع الحصة: ${roster.session.price.toLocaleString()} د.ج` : lang === 'en' ? `Session fee: ${roster.session.price.toLocaleString()} DA` : `Déduction: ${roster.session.price.toLocaleString()} DA`}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
+                      <span>🏷️</span>
+                      <span>
+                        {lang === 'ar'
+                          ? `اقتطاع الحصة: ${Math.round((roster.session.monthlyPrice || 0) / 4).toLocaleString()} د.ج`
+                          : lang === 'en'
+                          ? `Session fee: ${Math.round((roster.session.monthlyPrice || 0) / 4).toLocaleString()} DA`
+                          : `Déduction: ${Math.round((roster.session.monthlyPrice || 0) / 4).toLocaleString()} DA`}
+                      </span>
+                      {roster.session.sessionType === 'extra' && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                          {lang === 'ar' ? 'حصة إضافية' : 'Extra'}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">{roster.session.sessionDate} · {roster.session.plannedStartTime}</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex gap-2 text-xs font-medium">
@@ -592,7 +656,7 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
                     {(s.firstNameAr || s.firstNameFr || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-[#0F172A] truncate" dir="rtl">{s.lastNameAr} {s.firstNameAr}</p>
                       {s.wasInDebt ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 border border-red-200 shrink-0">
@@ -601,6 +665,15 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
                       ) : s.creditBalance !== undefined && s.creditBalance !== null ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                           {lang === 'ar' ? `المتبقي: ${s.creditBalance} د.ج (${s.remainingSessions} حصص)` : lang === 'en' ? `Remaining: ${s.creditBalance} DA (${s.remainingSessions} sessions)` : `Reste: ${s.creditBalance} DA (${s.remainingSessions} s)`}
+                        </span>
+                      ) : null}
+                      {roster.session.price === 0 ? (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                          🎁 {lang === 'ar' ? 'اقتطاع: 0 د.ج' : '0 DA'}
+                        </span>
+                      ) : s.sessionPrice !== undefined && s.sessionPrice !== null && s.sessionPrice !== Math.round((roster.session.monthlyPrice || 0) / 4) ? (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                          💰 {lang === 'ar' ? `اقتطاع: ${s.sessionPrice} د.ج` : `${s.sessionPrice} DA`}
                         </span>
                       ) : null}
                     </div>

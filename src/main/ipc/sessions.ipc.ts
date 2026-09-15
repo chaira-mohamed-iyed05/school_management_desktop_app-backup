@@ -308,7 +308,8 @@ export function registerSessionsHandlers(): void {
 
     try {
       let sql = `
-        SELECT s.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr,
+        SELECT s.*, g.name as group_name, g.monthly_price as monthly_price,
+               c.name_ar as course_name_ar, c.name_fr as course_name_fr,
                t.first_name as teacher_first_name, t.last_name as teacher_last_name,
                (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = s.id AND ar.attendance_status IN ('present','late')) as present_count,
                (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = s.id AND ar.attendance_status = 'absent') as absent_count,
@@ -368,6 +369,8 @@ export function registerSessionsHandlers(): void {
           endTime: row.end_time || '',
           room: row.room,
           sessionType: row.session_type,
+          price: row.price !== undefined ? row.price : null,
+          monthlyPrice: row.monthly_price ?? null,
           status: row.status,
           cancelledReason: row.cancelled_reason,
           lateThresholdMinutes: row.late_threshold_minutes,
@@ -391,7 +394,8 @@ export function registerSessionsHandlers(): void {
 
     try {
       const session = sqlite.prepare(`
-        SELECT s.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
+        SELECT s.*, g.name as group_name, g.monthly_price as monthly_price,
+               c.name_ar as course_name_ar, c.name_fr as course_name_fr
         FROM attendance_sessions s
         LEFT JOIN groups g ON s.group_id = g.id
         LEFT JOIN courses c ON g.course_id = c.id
@@ -415,6 +419,8 @@ export function registerSessionsHandlers(): void {
         endTime: session.end_time,
         room: session.room,
         sessionType: session.session_type,
+        price: session.price !== undefined ? session.price : null,
+        monthlyPrice: session.monthly_price ?? null,
         status: session.status,
         cancelledReason: session.cancelled_reason,
         lateThresholdMinutes: session.late_threshold_minutes,
@@ -455,7 +461,7 @@ export function registerSessionsHandlers(): void {
       `).run(today)
 
       let sql = `
-        SELECT s.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
+        SELECT s.*, g.name as group_name, g.monthly_price, c.name_ar as course_name_ar, c.name_fr as course_name_fr
         FROM attendance_sessions s
         LEFT JOIN groups g ON s.group_id = g.id
         LEFT JOIN courses c ON g.course_id = c.id
@@ -489,6 +495,8 @@ export function registerSessionsHandlers(): void {
           endTime: row.end_time || '',
           room: row.room,
           sessionType: row.session_type,
+          price: row.price !== undefined ? row.price : null,
+          monthlyPrice: row.monthly_price ?? null,
           status: row.status,
         }
       })
@@ -514,8 +522,8 @@ export function registerSessionsHandlers(): void {
 
       const rows = sqlite.prepare(`
         SELECT s.id, s.group_id, s.session_date, s.planned_start_time, s.end_time,
-               s.room, s.status, s.session_type, s.cancelled_reason,
-               g.name as group_name,
+               s.room, s.status, s.session_type, s.cancelled_reason, s.price,
+               g.name as group_name, g.monthly_price,
                c.name_ar as course_name_ar, c.name_fr as course_name_fr,
                (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = s.id AND ar.attendance_status IN ('present','late')) as present_count,
                CASE WHEN s.status = 'closed'
@@ -546,6 +554,8 @@ export function registerSessionsHandlers(): void {
           room: row.room,
           status: row.status,
           sessionType: row.session_type,
+          price: row.price !== undefined ? row.price : null,
+          monthlyPrice: row.monthly_price ?? null,
           cancelledReason: row.cancelled_reason,
           presentCount: row.present_count ?? 0,
           enrolledCount: row.enrolled_count ?? 0,

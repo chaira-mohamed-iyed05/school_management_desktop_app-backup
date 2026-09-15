@@ -280,12 +280,19 @@ export default function Courses() {
 
   const handleAddExtraSession = async (groupId: number) => {
     setSaving(true)
+    setError('')
     try {
       let finalPrice: number | null = null
       if (extraSessionForm.priceType === 'free') {
         finalPrice = 0
       } else if (extraSessionForm.priceType === 'custom') {
-        finalPrice = parseFloat(extraSessionForm.customPrice) || 0
+        const parsed = parseFloat(extraSessionForm.customPrice)
+        if (isNaN(parsed) || parsed < 0) {
+          setError(lang === 'ar' ? 'يرجى إدخال مبلغ صحيح للحصة الإضافية' : 'Veuillez saisir un montant valide pour la séance supplémentaire')
+          setSaving(false)
+          return
+        }
+        finalPrice = parsed
       }
 
       const res = await window.schoolApp.sessions.createExtra({

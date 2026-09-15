@@ -5,6 +5,24 @@ import { requireSession } from './auth.service'
 import type { AttendanceSession, AttendanceRecord, QRScanResult, AttendanceStatusType } from '../../shared/types/index'
 import log from 'electron-log'
 
+/**
+ * Resolves the deterministic session deduction price for an enrollment.
+ * - If sessionPrice is 0 -> 0 DA (Free session)
+ * - If sessionPrice > 0 -> sessionPrice DA (Custom session price)
+ * - If sessionPrice is null/undefined -> regular group session price: (agreedPrice || monthlyPrice) / 4
+ */
+export function getSessionDeductionPrice(
+  sessionPrice: number | null | undefined,
+  agreedPrice: number | null | undefined,
+  monthlyPrice: number | null | undefined
+): number {
+  if (sessionPrice !== null && sessionPrice !== undefined) {
+    return Number(sessionPrice)
+  }
+  const base = agreedPrice || monthlyPrice || 0
+  return Math.round((base / 4) * 100) / 100
+}
+
 // ─── Start session ────────────────────────────────────────────────────────────
 
 export async function startAttendanceSession(data: {
@@ -49,17 +67,18 @@ export async function startAttendanceSession(data: {
     }
     sessionRow = existingForDate
   } else {
-    const result = await db.insert(schema.attendanceSessions).values({
+    // Generate new regular session
+    const [inserted] = await db.insert(schema.attendanceSessions).values({
       groupId: data.groupId,
       sessionDate: data.sessionDate,
       plannedStartTime: data.plannedStartTime ?? null,
       actualStartTime: now.slice(11, 16),
       lateThresholdMinutes: data.lateThresholdMinutes ?? 10,
       status: 'open',
+      sessionType: 'regular',
       createdBy: session.adminId,
-      updatedAt: now,
     }).returning()
-    sessionRow = result[0]!
+    sessionRow = inserted
   }
 
   // Auto-seed absent attendance_records + deductions for all active enrollments
@@ -83,8 +102,7 @@ export async function startAttendanceSession(data: {
       `).run(sessionRow!.id, en.student_id, session.adminId)
 
       // Deduct session fee (idempotent — deductSession skips if already deducted)
-      const price = en.agreed_price || en.monthly_price || 0
-      const sessPrice = Math.round((price / 4) * 100) / 100
+      const sessPrice = getSessionDeductionPrice(sessionRow?.price, en.agreed_price, en.monthly_price)
       if (sessPrice > 0) {
         try {
           await deductSession({
@@ -123,19 +141,25 @@ export function isEnrolledBeforeSessionClose(
   enrollmentCreatedAt: string | null | undefined,
   sessionDate: string,
   sessionStatus: string,
-  sessionClosedAt: string | null | undefined
+  sessionClosedAt?: string | null
 ): boolean {
-  if (enrollmentDate < sessionDate) return true
-  if (enrollmentDate > sessionDate) return false
+  if (enrollmentDate > sessionDate) {
+    return false
+  }
+  if (enrollmentDate < sessionDate) {
+    return true
+  }
 
-  // Same date
-  if (sessionStatus !== 'closed') return true
+  // Same day: if session is closed and we have timestamps, compare precisely
+  if (sessionStatus === 'closed' && sessionClosedAt && enrollmentCreatedAt) {
+    const enrTime = parseUtcTimestamp(enrollmentCreatedAt)
+    const closeTime = parseUtcTimestamp(sessionClosedAt)
+    if (enrTime > 0 && closeTime > 0) {
+      return enrTime <= closeTime
+    }
+  }
 
-  const closeTimeMs = parseUtcTimestamp(sessionClosedAt)
-  const enrollTimeMs = parseUtcTimestamp(enrollmentCreatedAt)
-
-  if (!closeTimeMs) return true
-  return enrollTimeMs <= closeTimeMs
+  return true
 }
 
 export async function endAttendanceSession(sessionId: number): Promise<void> {
@@ -189,8 +213,7 @@ export async function endAttendanceSession(sessionId: number): Promise<void> {
         WHERE session_id = ? AND student_id = ?
       `).get(sessionId, en.student_id) as any
 
-      const price = en.agreed_price || en.monthly_price || 0
-      const sessPrice = Math.round((price / 4) * 100) / 100
+      const sessPrice = getSessionDeductionPrice(existing.price, en.agreed_price, en.monthly_price)
 
       if (!existingRecord) {
         // Insert absent record
@@ -285,8 +308,13 @@ export async function markSessionAttended(
   }
 
   // Calculate session price
-  const price = enrollment.agreed_price || enrollment.monthly_price || 0
-  const sessionPrice = Math.round((price / 4) * 100) / 100
+  const sessionPrice = getSessionDeductionPrice(
+    attendanceSession.price,
+    enrollment.agreed_price,
+    enrollment.monthly_price
+  )
+  const baseMonthly = enrollment.agreed_price || enrollment.monthly_price || 0
+  const regularSessPrice = Math.round((baseMonthly / 4) * 100) / 100
 
   const { getEnrollmentBalance, deductSession, rechargeSessionCharge } = await import('./payment.service')
   const now = new Date().toISOString()
@@ -313,7 +341,7 @@ export async function markSessionAttended(
         attendanceStatus: 'present',
         creditBalance: curBal.balance,
         sessionPrice,
-        remainingSessions: sessionPrice > 0 ? Math.floor(curBal.balance / sessionPrice) : 0,
+        remainingSessions: regularSessPrice > 0 ? Math.floor(curBal.balance / regularSessPrice) : 0,
         wasInDebt: curBal.balance < 0,
       }
     }
@@ -389,7 +417,7 @@ export async function markSessionAttended(
     attendanceStatus: 'present',
     creditBalance: updatedBal.balance,
     sessionPrice,
-    remainingSessions: sessionPrice > 0 ? Math.floor(updatedBal.balance / sessionPrice) : 0,
+    remainingSessions: regularSessPrice > 0 ? Math.floor(updatedBal.balance / regularSessPrice) : 0,
     wasInDebt: updatedBal.balance < 0,
   }
 }
@@ -841,7 +869,7 @@ export async function resolveStudentSessions(rawToken: string, date: string): Pr
   for (const groupId of groupIds) {
     // Check for existing session instances
     const allExisting = sqlite.prepare(`
-      SELECT s.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
+      SELECT s.*, g.name as group_name, g.monthly_price, c.name_ar as course_name_ar, c.name_fr as course_name_fr
       FROM attendance_sessions s
       JOIN groups g ON s.group_id = g.id
       JOIN courses c ON g.course_id = c.id
@@ -863,6 +891,9 @@ export async function resolveStudentSessions(rawToken: string, date: string): Pr
         endTime: r.end_time,
         room: r.room,
         status: r.status,
+        sessionType: r.session_type,
+        price: r.price !== undefined ? r.price : null,
+        monthlyPrice: r.monthly_price ?? null,
       })))
     } else if (!hasCancelled) {
       // Auto-create from schedule slots if today matches weekday and not cancelled
@@ -879,7 +910,7 @@ export async function resolveStudentSessions(rawToken: string, date: string): Pr
         `).run(groupId, date, slot.start_time, slot.end_time, slot.room, slot.id)
 
         const sessRow = sqlite.prepare(`
-          SELECT s.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
+          SELECT s.*, g.name as group_name, g.monthly_price, c.name_ar as course_name_ar, c.name_fr as course_name_fr
           FROM attendance_sessions s
           JOIN groups g ON s.group_id = g.id
           JOIN courses c ON g.course_id = c.id
@@ -899,6 +930,9 @@ export async function resolveStudentSessions(rawToken: string, date: string): Pr
             endTime: sessRow.end_time,
             room: sessRow.room,
             status: sessRow.status || 'open',
+            sessionType: sessRow.session_type,
+            price: sessRow.price !== undefined ? sessRow.price : null,
+            monthlyPrice: sessRow.monthly_price ?? null,
           })
         }
       }
@@ -1015,8 +1049,11 @@ export async function markStudentInSession(
   `).get(studentId, session.groupId) as any
 
   const wasEnrolled = enrollment ? (session.sessionDate >= enrollment.enrollment_date) : false
-  const price = enrollment ? (enrollment.agreed_price || enrollment.monthly_price || 0) : 0
-  const sessionPrice = Math.round((price / 4) * 100) / 100
+  const sessionPrice = getSessionDeductionPrice(
+    session.price,
+    enrollment?.agreed_price,
+    enrollment?.monthly_price
+  )
 
   const { getEnrollmentBalance, deductSession, refundSessionCharge, rechargeSessionCharge } = await import('./payment.service')
 
@@ -1195,7 +1232,7 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
   const sqlite = getSqlite()
 
   const session = sqlite.prepare(`
-    SELECT s.*, g.name as group_name, g.course_id,
+    SELECT s.*, g.name as group_name, g.course_id, g.monthly_price as group_monthly_price,
            c.name_ar as course_name_ar, c.name_fr as course_name_fr
     FROM attendance_sessions s
     JOIN groups g ON s.group_id = g.id
@@ -1240,8 +1277,11 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
           s.attendance_status = 'absent'
           s.is_inactive = 0
 
-          const price = s.agreed_price || s.monthly_price || 0
-          const sessPrice = Math.round((price / 4) * 100) / 100
+          const sessPrice = getSessionDeductionPrice(
+            session.price,
+            s.agreed_price,
+            s.monthly_price
+          )
           if (sessPrice > 0 && s.enrollment_id) {
             await deductSession({
               studentId: s.id,
@@ -1261,9 +1301,14 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
   const { getEnrollmentBalance } = await import('./payment.service')
   const studentsWithBalance = await Promise.all(enrolled.map(async s => {
     const bal = s.enrollment_id ? await getEnrollmentBalance(s.enrollment_id) : { balance: 0 }
-    const price = s.agreed_price || s.monthly_price || 0
-    const sessPrice = Math.round((price / 4) * 100) / 100
-    const remSessions = sessPrice > 0 ? Math.floor(bal.balance / sessPrice) : 0
+    const sessPrice = getSessionDeductionPrice(
+      session.price,
+      s.agreed_price,
+      s.monthly_price
+    )
+    const baseMonthly = s.agreed_price || s.monthly_price || 0
+    const regularSessPrice = Math.round((baseMonthly / 4) * 100) / 100
+    const remSessions = regularSessPrice > 0 ? Math.floor(bal.balance / regularSessPrice) : 0
 
     const wasEnrolledBefore = isEnrolledBeforeSessionClose(
       s.enrollment_date,
@@ -1329,6 +1374,8 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
       room: session.room,
       status: session.status,
       sessionType: session.session_type,
+      price: session.price !== undefined ? session.price : null,
+      monthlyPrice: session.group_monthly_price ?? session.monthly_price ?? null,
       stats: { present: presentCount, absent: absentCount, inactive: inactiveCount, total: sessionEnrolledTotal },
     },
     students: studentsWithBalance,
@@ -1390,7 +1437,7 @@ export async function reconcilePastSessionsAttendance(): Promise<{ reconciledCou
   // Find all past or currently-started non-cancelled sessions
   const pastSessions = sqlite.prepare(`
     SELECT s.id, s.group_id, s.session_date, s.planned_start_time, s.actual_start_time,
-           s.status, s.created_at, s.updated_at,
+           s.status, s.created_at, s.updated_at, s.price,
            g.monthly_price
     FROM attendance_sessions s
     JOIN groups g ON s.group_id = g.id
@@ -1434,8 +1481,11 @@ export async function reconcilePastSessionsAttendance(): Promise<{ reconciledCou
         WHERE session_id = ? AND student_id = ?
       `).get(sess.id, en.student_id) as any
 
-      const price = en.agreed_price || sess.monthly_price || 0
-      const sessPrice = Math.round((price / 4) * 100) / 100
+      const sessPrice = getSessionDeductionPrice(
+        sess.price,
+        en.agreed_price,
+        sess.monthly_price
+      )
 
       if (!existing) {
         // Insert absent record
