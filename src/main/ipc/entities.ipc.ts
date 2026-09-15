@@ -7,7 +7,7 @@ import {
   CreateEnrollmentSchema,
 } from '../../shared/schemas/index'
 import {
-  listTeachers, createTeacher, updateTeacher, archiveTeacher,
+  listTeachers, createTeacher, updateTeacher, archiveTeacher, deleteTeacher,
   listCourses, createCourse, updateCourse, deleteCourse,
   listGroups, createGroup, updateGroup, deleteGroup,
   createEnrollment, updateEnrollment, listEnrollmentsByStudent, listEnrollmentsByGroup,
@@ -33,6 +33,10 @@ export function registerEntityHandlers(): void {
     const { id } = z.object({ id: z.number().int().positive() }).parse(payload)
     await archiveTeacher(id)
     return true
+  })
+  handle(IPC_CHANNELS.TEACHERS_DELETE, async (payload) => {
+    const { id } = z.object({ id: z.number().int().positive() }).parse(payload)
+    return deleteTeacher(id)
   })
 
   // Courses

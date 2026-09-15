@@ -139,37 +139,6 @@ export async function archiveTeacher(id: number): Promise<void> {
   await db.update(schema.teachers).set({ status: 'archived', archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).where(eq(schema.teachers.id, id))
 }
 
-// ─── Courses ─────────────────────────────────────────────────────────────────
-
-export async function listCourses(opts: { status?: string } = {}): Promise<Course[]> {
-  const db = getDb()
-  const rows = await db.select().from(schema.courses).orderBy(desc(schema.courses.createdAt))
-  const filtered = opts.status && opts.status !== 'all' ? rows.filter(r => r.status === opts.status) : rows
-  return filtered.map(r => ({
-    id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn,
-    descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null,
-    defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt,
-  }))
-}
-
-export async function createCourse(data: { nameAr: string; nameFr: string; nameEn?: string; descriptionAr?: string | null; descriptionFr?: string | null; descriptionEn?: string | null; defaultPrice: number }): Promise<Course> {
-  requireSession()
-  const db = getDb()
-  const result = await db.insert(schema.courses).values({ ...data, nameEn: data.nameEn ?? '', updatedAt: new Date().toISOString() }).returning()
-  const r = (result as any[])[0]!
-  return { id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn, descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null, defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
-}
-
-export async function updateCourse(id: number, data: Partial<{ nameAr: string; nameFr: string; nameEn: string; descriptionAr: string | null; descriptionFr: string | null; defaultPrice: number; status: Course['status'] }>): Promise<Course> {
-  requireSession()
-  const db = getDb()
-  const result = await db.update(schema.courses).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(schema.courses.id, id)).returning()
-  const rows = result as any[]
-  if (!rows[0]) throw new AppError(ErrorCode.NOT_FOUND, 'Course not found')
-  const r = rows[0]
-  return { id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn, descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null, defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
-}
-
 /**
  * Safely cascades the deletion of a group and all its related dependencies in strictly safe foreign-key order.
  * Must be executed within a transaction.
@@ -207,6 +176,59 @@ function cascadeDeleteGroupInternal(sqlite: any, groupId: number): void {
   sqlite.prepare(`
     DELETE FROM groups WHERE id = ?
   `).run(groupId)
+}
+
+export async function deleteTeacher(id: number): Promise<boolean> {
+  requireSession()
+  const sqlite = getSqlite()
+
+  return sqlite.transaction(() => {
+    // 1. Unlink default teacher on courses
+    sqlite.prepare(`
+      UPDATE courses SET default_teacher_id = NULL, updated_at = datetime('now') WHERE default_teacher_id = ?
+    `).run(id)
+
+    // 2. Find all groups taught by this teacher and safely cascade delete them
+    const teacherGroups = sqlite.prepare(`SELECT id FROM groups WHERE teacher_id = ?`).all(id) as { id: number }[]
+    for (const g of teacherGroups) {
+      cascadeDeleteGroupInternal(sqlite, g.id)
+    }
+
+    // 3. Finally delete the teacher
+    sqlite.prepare(`DELETE FROM teachers WHERE id = ?`).run(id)
+    return true
+  })()
+}
+
+// ─── Courses ─────────────────────────────────────────────────────────────────
+
+export async function listCourses(opts: { status?: string } = {}): Promise<Course[]> {
+  const db = getDb()
+  const rows = await db.select().from(schema.courses).orderBy(desc(schema.courses.createdAt))
+  const filtered = opts.status && opts.status !== 'all' ? rows.filter(r => r.status === opts.status) : rows
+  return filtered.map(r => ({
+    id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn,
+    descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null,
+    defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt,
+  }))
+}
+
+export async function createCourse(data: { nameAr: string; nameFr: string; nameEn?: string; descriptionAr?: string | null; descriptionFr?: string | null; descriptionEn?: string | null; defaultPrice: number }): Promise<Course> {
+  requireSession()
+  const db = getDb()
+  const result = await db.insert(schema.courses).values({ ...data, nameEn: data.nameEn ?? '', updatedAt: new Date().toISOString() }).returning()
+  const r = (result as any[])[0]!
+  return { id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn, descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null, defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
+}
+
+export async function updateCourse(id: number, data: Partial<{ nameAr: string; nameFr: string; nameEn: string; descriptionAr: string | null; descriptionFr: string | null; defaultPrice: number; status: Course['status'] }>): Promise<Course> {
+  requireSession()
+  const db = getDb()
+  const result = await db.update(schema.courses).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(schema.courses.id, id)).returning()
+  const rows = result as any[]
+  if (!rows[0]) throw new AppError(ErrorCode.NOT_FOUND, 'Course not found')
+  const r = rows[0]
+  return { id: r.id, nameAr: r.nameAr, nameFr: r.nameFr, nameEn: r.nameEn, descriptionAr: r.descriptionAr ?? null, descriptionFr: r.descriptionFr ?? null, descriptionEn: r.descriptionEn ?? null, defaultPrice: r.defaultPrice, status: r.status as Course['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
 }
 
 export async function deleteCourse(id: number): Promise<boolean> {

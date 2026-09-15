@@ -88,6 +88,8 @@ const api = {
       invoke<Teacher>(IPC_CHANNELS.TEACHERS_UPDATE, { id, ...data }),
     archive: (id: number) =>
       invoke<boolean>(IPC_CHANNELS.TEACHERS_ARCHIVE, { id }),
+    delete: (id: number) =>
+      invoke<boolean>(IPC_CHANNELS.TEACHERS_DELETE, { id }),
   },
 
   courses: {

@@ -54,6 +54,7 @@ export const IPC_CHANNELS = {
   TEACHERS_CREATE: 'teachers:create',
   TEACHERS_UPDATE: 'teachers:update',
   TEACHERS_ARCHIVE: 'teachers:archive',
+  TEACHERS_DELETE: 'teachers:delete',
 
   // Courses
   COURSES_LIST: 'courses:list',

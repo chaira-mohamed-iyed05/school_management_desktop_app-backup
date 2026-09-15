@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Archive, Camera, RefreshCw, BookOpen, Filter } from 'lucide-react'
+import { Plus, Pencil, Archive, Camera, RefreshCw, BookOpen, Filter, Trash2 } from 'lucide-react'
 import type { Teacher, Course } from '@shared/types/index'
 import { getCourseName } from '../utils/format'
 import { useConfirm } from '../components/feedback/DialogProvider'
@@ -152,6 +152,33 @@ export default function Teachers() {
     await load()
   }
 
+  const handleDelete = async (id: number, teacherName: string) => {
+    const msg = lang === 'ar'
+      ? `هل أنت متأكد من الحذف النهائي للأستاذ "${teacherName}"؟ سيتم حذف جميع أفواجه وحصصه وجداولها وإلغاء تسجيلات الطلاب تلقائياً وبأمان.`
+      : `Êtes-vous sûr de vouloir supprimer définitivement l'enseignant "${teacherName}" ? Tous ses groupes, séances et inscriptions seront supprimés en toute sécurité.`
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: msg,
+      variant: 'danger',
+    })
+    if (!ok) return
+
+    try {
+      const res = await window.schoolApp.teachers.delete(id)
+      if (res && !res.success) {
+        alert(res.error || (lang === 'ar' ? 'فشل حذف الأستاذ' : "Échec de la suppression de l'enseignant"))
+        return
+      }
+      if (editing?.id === id) {
+        setEditing(null)
+        setShowForm(false)
+      }
+      await load()
+    } catch (err: any) {
+      alert(err.message || (lang === 'ar' ? 'حدث خطأ أثناء حذف الأستاذ' : 'Erreur lors de la suppression'))
+    }
+  }
+
   const inputCls = 'w-full px-3 py-2 border border-border rounded-lg text-sm focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 transition-all bg-white'
 
   return (
@@ -248,19 +275,26 @@ export default function Teachers() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2 pt-3 border-t border-slate-100 flex-wrap">
                   <button onClick={() => openEdit(teacher)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#2563EB] transition-colors font-medium">
                     <Pencil size={11} /> {t('common.edit')}
                   </button>
                   {teacher.status === 'archived' ? (
-                    <button onClick={() => handleRestore(teacher.id)} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors ms-auto font-semibold">
+                    <button onClick={() => handleRestore(teacher.id)} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-semibold">
                       <RefreshCw size={11} /> {t('teachers.restore')}
                     </button>
                   ) : (
-                    <button onClick={() => handleArchive(teacher.id)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors ms-auto">
+                    <button onClick={() => handleArchive(teacher.id)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-amber-600 transition-colors">
                       <Archive size={11} /> {t('teachers.archive')}
                     </button>
                   )}
+                  <button
+                    onClick={() => handleDelete(teacher.id, `${teacher.lastName} ${teacher.firstName}`)}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors ms-auto font-medium"
+                    title={t('common.delete')}
+                  >
+                    <Trash2 size={11} /> {t('common.delete')}
+                  </button>
                 </div>
               </div>
             )
