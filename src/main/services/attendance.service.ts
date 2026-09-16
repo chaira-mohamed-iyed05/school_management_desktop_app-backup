@@ -1029,6 +1029,7 @@ export async function markStudentInSession(
     where: eq(schema.attendanceSessions.id, sessionId),
   })
   if (!session) throw new AppError(ErrorCode.SESSION_NOT_FOUND, 'Session not found')
+  if (session.sessionType === 'cancelled') throw new AppError(ErrorCode.SESSION_CLOSED, 'Session is cancelled')
 
   const student = await db.query.students.findFirst({ where: eq(schema.students.id, studentId) })
   if (!student) throw new AppError(ErrorCode.NOT_FOUND, 'Student not found')
@@ -1254,8 +1255,8 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
     ORDER BY st.last_name_ar, st.first_name_ar
   `).all(sessionId, session.group_id) as any[]
 
-  // For closed sessions, auto-heal any missing absent records for students enrolled before closing
-  if (session.status === 'closed') {
+  // For closed sessions (that are not cancelled), auto-heal any missing absent records for students enrolled before closing
+  if (session.status === 'closed' && session.session_type !== 'cancelled') {
     const { deductSession } = await import('./payment.service')
     for (const s of enrolled) {
       const wasEnrolledBefore = isEnrolledBeforeSessionClose(
@@ -1319,7 +1320,10 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
     )
 
     let attendanceStatus: string | null = null
-    if (s.is_inactive === 1 || s.attendance_status === 'inactive' || s.attendance_status === 'not_active') {
+    if (session.session_type === 'cancelled') {
+      // Cancelled session: do not mark absent
+      attendanceStatus = null
+    } else if (s.is_inactive === 1 || s.attendance_status === 'inactive' || s.attendance_status === 'not_active') {
       attendanceStatus = 'inactive'
     } else if (s.attendance_status === 'present' || s.attendance_status === 'late') {
       attendanceStatus = 'present'
@@ -1357,7 +1361,7 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
   const presentCount = studentsWithBalance.filter(s => s.attendanceStatus === 'present').length
   const absentCount = studentsWithBalance.filter(s => s.attendanceStatus === 'absent').length
   const inactiveCount = studentsWithBalance.filter(s => s.attendanceStatus === 'inactive').length
-  const sessionEnrolledTotal = session.status === 'closed'
+  const sessionEnrolledTotal = (session.status === 'closed' && session.session_type !== 'cancelled')
     ? studentsWithBalance.filter(s => s.wasEnrolledBefore || s.attendanceStatus !== null).length
     : enrolled.length
 

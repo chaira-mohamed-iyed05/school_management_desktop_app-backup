@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
-import { ScanLine, Search, Calendar, CheckCircle2, CheckCircle, Clock, XCircle, Volume2, VolumeX, ChevronLeft, ChevronRight, AlertCircle, CreditCard, Trash2 } from 'lucide-react'
+import { ScanLine, Search, Calendar, CheckCircle2, CheckCircle, Clock, XCircle, Volume2, VolumeX, ChevronLeft, ChevronRight, AlertCircle, CreditCard, Trash2, X, Ban } from 'lucide-react'
 
 type Tab = 'scanner' | 'roster' | 'calendar'
 type StatusType = 'present' | 'absent' | 'late' | 'not_active' | null
@@ -485,23 +485,40 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
     await loadRoster(selectedSession)
   }
 
-  const handleCancelSession = async (sessionId: number) => {
-    const confirmMsg = lang === 'ar'
-      ? 'هل أنت تأكد من إلغاء هذه الحصة؟ سيتم إغلاق الحصة وإعادة كافة المبالغ والأرصدة المقتطعة للطالب، وإلغاء تسجيل الحضور.'
-      : 'Voulez-vous vraiment annuler cette séance ? Les présences et déductions financières seront annulées.'
-    if (!confirm(confirmMsg)) return
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancellingSessionId, setCancellingSessionId] = useState<number | null>(null)
+  const [cancelReasonPreset, setCancelReasonPreset] = useState('غياب الأستاذ')
+  const [cancelCustomReason, setCancelCustomReason] = useState('')
+  const [cancelLoading, setCancelLoading] = useState(false)
 
+  const openCancelModal = (sessionId: number) => {
+    setCancellingSessionId(sessionId)
+    setCancelReasonPreset(lang === 'ar' ? 'غياب الأستاذ' : 'Teacher absent')
+    setCancelCustomReason('')
+    setCancelModalOpen(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!cancellingSessionId) return
+    const reason = cancelReasonPreset === 'other'
+      ? (cancelCustomReason.trim() || (lang === 'ar' ? 'إلغاء الحصة' : 'Session cancelled'))
+      : cancelReasonPreset
+
+    setCancelLoading(true)
     try {
-      const res = await window.schoolApp.sessions.cancel(sessionId, 'Cancelled from attendance page')
-      if (res.success) {
-        setRoster(null)
-        setSelectedSession(null)
+      const res = await window.schoolApp.sessions.cancel(cancellingSessionId, reason)
+      if (res && res.success) {
+        setCancelModalOpen(false)
         await loadSessions()
+        await loadRoster(cancellingSessionId)
       } else {
-        alert(res.error || 'Failed to cancel session')
+        alert(res?.error || 'Failed to cancel session')
       }
     } catch (err) {
       console.error('Failed to cancel session:', err)
+      alert(lang === 'ar' ? 'حدث خطأ أثناء إلغاء الحصة' : 'Failed to cancel session')
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -544,7 +561,7 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
         ) : (
           sessions.map(s => (
             <button key={s.id} onClick={() => loadRoster(s.id)}
-              className={`w-full text-left bg-white rounded-xl border-2 p-4 transition-all hover:shadow-sm ${selectedSession === s.id ? 'border-[#2563EB] bg-blue-50' : 'border-border'}`}>
+              className={`w-full text-left bg-white rounded-xl border-2 p-4 transition-all hover:shadow-sm ${selectedSession === s.id ? 'border-[#2563EB] bg-blue-50' : 'border-border'} ${s.sessionType === 'cancelled' ? 'border-red-200 bg-red-50/30 opacity-80' : ''}`}>
               <div className="flex items-center justify-between gap-1">
                 <p className="font-semibold text-sm text-[#0F172A] truncate">
                   {lang === 'ar' ? (s.courseNameAr || s.courseNameFr) : (s.courseNameFr || s.courseNameAr)}
@@ -575,7 +592,13 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{s.presentCount}/{s.enrolledCount}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
+                {s.sessionType === 'cancelled' ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold border border-red-200">
+                    {lang === 'ar' ? 'ملغاة' : lang === 'en' ? 'Cancelled' : 'Annulée'}
+                  </span>
+                ) : (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
+                )}
               </div>
             </button>
           ))
@@ -632,23 +655,61 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
                   <span className="text-amber-600 font-bold">{roster.session.stats.late} ⏱</span>
                   <span className="text-red-500 font-bold">{roster.session.stats.absent} ✗</span>
                 </div>
-                {roster.session.status === 'open' ? (
-                  <button
-                    onClick={() => handleCloseSession(roster.session.id)}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    title={lang === 'ar' ? 'إغلاق الحصة وتثبيت الحضور' : lang === 'en' ? 'Close session and finalize attendance' : 'Clôturer la séance'}
-                  >
-                    <CheckCircle size={13} />
-                    <span>{lang === 'ar' ? 'إغلاق الحصة' : lang === 'en' ? 'Close Session' : 'Clôturer la séance'}</span>
-                  </button>
-                ) : (
-                  <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center gap-1.5">
-                    <CheckCircle2 size={13} className="text-emerald-600" />
-                    <span>{lang === 'ar' ? 'حصة مغلقة' : lang === 'en' ? 'Closed' : 'Clôturée'}</span>
+                {roster.session.sessionType === 'cancelled' ? (
+                  <span className="px-3 py-1.5 bg-red-100 border border-red-300 text-red-700 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs">
+                    <Ban size={13} />
+                    <span>{lang === 'ar' ? 'حصة ملغاة' : lang === 'en' ? 'Session Cancelled' : 'Séance annulée'}</span>
                   </span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {roster.session.status === 'open' ? (
+                      <button
+                        onClick={() => handleCloseSession(roster.session.id)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        title={lang === 'ar' ? 'إغلاق الحصة وتثبيت الحضور' : lang === 'en' ? 'Close session and finalize attendance' : 'Clôturer la séance'}
+                      >
+                        <CheckCircle size={13} />
+                        <span>{lang === 'ar' ? 'إغلاق الحصة' : lang === 'en' ? 'Close Session' : 'Clôturer la séance'}</span>
+                      </button>
+                    ) : (
+                      <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-600" />
+                        <span>{lang === 'ar' ? 'حصة مغلقة' : lang === 'en' ? 'Closed' : 'Clôturée'}</span>
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => openCancelModal(roster.session.id)}
+                      className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title={lang === 'ar' ? 'إلغاء هذه الحصة واسترجاع أرصدة الطلاب' : lang === 'en' ? 'Cancel this session and refund credits' : 'Annuler cette séance'}
+                    >
+                      <XCircle size={13} />
+                      <span>{lang === 'ar' ? 'إلغاء الحصة' : lang === 'en' ? 'Cancel Session' : 'Annuler'}</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
+
+            {roster.session.sessionType === 'cancelled' && (
+              <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-2.5 shadow-2xs">
+                <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-sm">
+                    {lang === 'ar' ? 'هذه الحصة ملغاة' : lang === 'en' ? 'This session is cancelled' : 'Cette séance est annulée'}
+                    {roster.session.cancelledReason ? ` (${roster.session.cancelledReason})` : ''}
+                  </p>
+                  <p className="text-[11px] text-red-600 mt-0.5">
+                    {lang === 'ar'
+                      ? 'تم إلغاء هذه الحصة فقط لهذا اليوم. أُعيدت كافة الأرصدة والمبالغ المقتطعة للطلاب تلقائياً، ولن يتم احتساب أي حضور أو غياب في هذه الحصة.'
+                      : lang === 'en'
+                      ? 'Only this single session was cancelled. All student credits have been refunded and no attendance was counted.'
+                      : 'Seule cette séance a été annulée. Tous les crédits des étudiants ont été restitués.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="divide-y divide-slate-50 max-h-[60vh] overflow-y-auto">
               {roster.students.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors">
@@ -679,7 +740,14 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
                     </div>
                     <p className="text-xs text-slate-400 font-mono">#{s.studentNumber}</p>
                   </div>
-                  {roster.session.status === 'closed' ? (
+                  {roster.session.sessionType === 'cancelled' ? (
+                    <div className="shrink-0">
+                      <span className="text-xs px-3 py-1.5 rounded-lg font-bold bg-red-50 text-red-700 border border-red-200 flex items-center gap-1 shadow-2xs">
+                        <Ban size={12} />
+                        <span>{lang === 'ar' ? 'ملغاة (مسترجعة)' : lang === 'en' ? 'Cancelled' : 'Annulée'}</span>
+                      </span>
+                    </div>
+                  ) : roster.session.status === 'closed' ? (
                     <div className="shrink-0">
                       {s.attendanceStatus === 'present' ? (
                         <span className="text-xs px-3 py-1.5 rounded-lg font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
@@ -722,6 +790,131 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
           </div>
         ) : null}
       </div>
+
+      {/* Cancel Session Modal */}
+      {cancelModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fade-in" onClick={() => !cancelLoading && setCancelModalOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative z-[101]" onClick={(e) => e.stopPropagation()} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                  <XCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#0F172A]">
+                    {lang === 'ar' ? 'إلغاء هذه الحصة' : lang === 'en' ? 'Cancel This Session' : 'Annuler cette séance'}
+                  </h3>
+                  {roster?.session && (
+                    <p className="text-xs text-slate-500 font-medium">
+                      {roster.session.groupName} · {roster.session.sessionDate} ({roster.session.plannedStartTime})
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                disabled={cancelLoading}
+                onClick={() => setCancelModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1">
+                <p className="font-bold text-[13px] flex items-center gap-1.5">
+                  <span>ℹ️</span>
+                  <span>{lang === 'ar' ? 'تأثير الإلغاء على الطلاب والجدول:' : 'Session Cancellation Effect:'}</span>
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-700 text-[11px] leading-relaxed">
+                  <li>
+                    {lang === 'ar'
+                      ? 'سيتم إلغاء هذه الحصة فقط لهذا اليوم دون أي تأثير على حصص الأسابيع القادمة أو السابقة في الجدول الأسبوعي.'
+                      : 'Only this single session for today will be cancelled. Past and future weeks remain unaffected.'}
+                  </li>
+                  <li>
+                    {lang === 'ar'
+                      ? 'سيتم استرجاع كافة المبالغ والأرصدة المقتطعة تلقائياً وإعادتها فوراً إلى رصيد الطلاب.'
+                      : 'Any credits deducted for this session will be immediately refunded to students.'}
+                  </li>
+                  <li>
+                    {lang === 'ar'
+                      ? 'لن يتم تسجيل أي حضور أو غياب للطلاب لهذه الحصة.'
+                      : 'No presence or absence will be counted for this session.'}
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {lang === 'ar' ? 'سبب الإلغاء:' : 'Cancellation Reason:'}
+                </label>
+                <select
+                  value={cancelReasonPreset}
+                  onChange={(e) => setCancelReasonPreset(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-[#0F172A] focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none cursor-pointer"
+                >
+                  <option value={lang === 'ar' ? 'غياب الأستاذ' : 'Teacher absent'}>
+                    {lang === 'ar' ? 'غياب الأستاذ (لم يحضر الأستاذ)' : 'Teacher absent'}
+                  </option>
+                  <option value={lang === 'ar' ? 'عطلة رسمية / إجازة مدرسية' : 'Official holiday'}>
+                    {lang === 'ar' ? 'عطلة رسمية / إجازة مدرسية' : 'Official holiday'}
+                  </option>
+                  <option value={lang === 'ar' ? 'سوء الأحوال الجوية' : 'Bad weather'}>
+                    {lang === 'ar' ? 'سوء الأحوال الجوية' : 'Bad weather'}
+                  </option>
+                  <option value={lang === 'ar' ? 'مشكلة تقنية أو عدم توفر القاعة' : 'Technical / Room issue'}>
+                    {lang === 'ar' ? 'مشكلة تقنية أو عدم توفر القاعة' : 'Technical / Room issue'}
+                  </option>
+                  <option value="other">
+                    {lang === 'ar' ? 'سبب آخر (تحديد يدوي)...' : 'Other reason...'}
+                  </option>
+                </select>
+              </div>
+
+              {cancelReasonPreset === 'other' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {lang === 'ar' ? 'يرجى كتابة سبب الإلغاء:' : 'Specify reason:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={cancelCustomReason}
+                    onChange={(e) => setCancelCustomReason(e.target.value)}
+                    placeholder={lang === 'ar' ? 'مثال: ظرف طارئ، أعمال صيانة...' : 'Reason...'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 mt-6 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={cancelLoading}
+                onClick={() => setCancelModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                {lang === 'ar' ? 'تراجع' : 'Back'}
+              </button>
+              <button
+                type="button"
+                disabled={cancelLoading}
+                onClick={handleConfirmCancel}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {cancelLoading ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <XCircle size={14} />
+                )}
+                <span>{lang === 'ar' ? 'تأكيد إلغاء الحصة واسترجاع الرصيد' : 'Confirm Cancel & Refund'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -883,7 +1076,13 @@ function CalendarView({ lang, onSessionClick }: { lang: string; onSessionClick: 
                 <p className="text-[11px] text-slate-400">{s.groupName} · {s.plannedStartTime}</p>
                 <div className="flex gap-1.5 mt-1">
                   <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">{s.presentCount}/{s.enrolledCount}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${s.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
+                  {s.sessionType === 'cancelled' ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-bold border border-red-200">
+                      {lang === 'ar' ? 'ملغاة' : 'Annulée'}
+                    </span>
+                  ) : (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${s.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
+                  )}
                 </div>
               </button>
             ))

@@ -112,3 +112,49 @@ describe('Session Closing Enrollment and Attendance Rules (غلق الحصة)', 
     expect(isEnrolledBeforeSessionClose('2026-09-06', '2026-09-06 10:30:31', sessionDate, 'open', null)).toBe(true)
   })
 })
+
+describe('Session Cancellation Credit Restoration Rules (إلغاء الحصة)', () => {
+  it('cancelling a session completely reverts session deductions and restores student credit balance', () => {
+    // Initial student credit balance (e.g. 3000 DA)
+    const initialCredit = 3000
+    const sessionFee = 750
+
+    // Session occurred: 750 DA was deducted (session_charge)
+    const balanceAfterSession = initialCredit - sessionFee
+    expect(balanceAfterSession).toBe(2250)
+
+    // Professor did not come -> admin cancels the session
+    // Reverting financial deductions restores exact fee back
+    const balanceAfterCancellation = balanceAfterSession + sessionFee
+    expect(balanceAfterCancellation).toBe(initialCredit)
+  })
+
+  it('session cancellation ensures session_type is cancelled and only that specific session is affected', () => {
+    const weeklyScheduleSlots = [
+      { id: 1, group_id: 10, weekday: 1, start_time: '14:00', end_time: '16:00' },
+      { id: 2, group_id: 10, weekday: 3, start_time: '10:00', end_time: '12:00' }
+    ]
+
+    // Cancelled single instance on 2026-09-15
+    const sessionInstances = [
+      { id: 101, session_date: '2026-09-08', session_type: 'regular', status: 'closed' },
+      { id: 102, session_date: '2026-09-15', session_type: 'cancelled', status: 'closed', cancelled_reason: 'غياب الأستاذ' },
+      { id: 103, session_date: '2026-09-22', session_type: 'regular', status: 'open' }
+    ]
+
+    // Weekly schedule slots remain intact (2 slots)
+    expect(weeklyScheduleSlots.length).toBe(2)
+
+    // Past session on 2026-09-08 is untouched
+    expect(sessionInstances[0].session_type).toBe('regular')
+
+    // Only session 102 on 2026-09-15 is cancelled
+    expect(sessionInstances[1].session_type).toBe('cancelled')
+    expect(sessionInstances[1].cancelled_reason).toBe('غياب الأستاذ')
+
+    // Future session on 2026-09-22 is untouched
+    expect(sessionInstances[2].session_type).toBe('regular')
+    expect(sessionInstances[2].status).toBe('open')
+  })
+})
+

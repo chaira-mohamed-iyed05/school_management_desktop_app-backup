@@ -247,19 +247,34 @@ export function registerSessionsHandlers(): void {
     const sqlite = getSqlite()
 
     try {
-      // Revert financial deductions for this session
-      sqlite.prepare(`DELETE FROM payments WHERE session_id = ? AND payment_type = 'deduction'`).run(sessionId)
-      // Delete attendance records for this session
-      sqlite.prepare(`DELETE FROM attendance_records WHERE session_id = ?`).run(sessionId)
-      // Mark session as cancelled
-      sqlite.prepare(`
-        UPDATE attendance_sessions
-        SET session_type = 'cancelled', status = 'closed', cancelled_reason = ?, updated_at = datetime('now')
-        WHERE id = ?
-      `).run(reason || 'Séance annulée', sessionId)
+      return sqlite.transaction(() => {
+        // Revert financial deductions for this session (both 'session_charge' and 'deduction', plus any session refund)
+        sqlite.prepare(`
+          DELETE FROM payments
+          WHERE session_id = ? AND payment_type IN ('deduction', 'session_charge', 'refund', 'session_refund')
+        `).run(sessionId)
 
-      log.info(`Cancelled session ${sessionId}, reason: ${reason}`)
-      return true
+        // Delete attendance records for this session
+        sqlite.prepare(`DELETE FROM attendance_records WHERE session_id = ?`).run(sessionId)
+
+        // Mark session as cancelled
+        sqlite.prepare(`
+          UPDATE attendance_sessions
+          SET session_type = 'cancelled', status = 'closed', cancelled_reason = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `).run(reason || 'Séance annulée', sessionId)
+
+        // Audit log entry
+        try {
+          sqlite.prepare(`
+            INSERT INTO audit_logs (administrator_id, action, entity_type, entity_id, sanitized_details_json, created_at)
+            VALUES (1, 'session.cancel', 'attendance_session', ?, ?, datetime('now'))
+          `).run(sessionId, JSON.stringify({ sessionId, reason: reason || 'Séance annulée' }))
+        } catch {}
+
+        log.info(`Cancelled session ${sessionId}, reason: ${reason}`)
+        return true
+      })()
     } catch (err) {
       log.error('Failed to cancel session:', err)
       throw new Error(`Erreur lors de l'annulation: ${err instanceof Error ? err.message : String(err)}`)
@@ -283,13 +298,18 @@ export function registerSessionsHandlers(): void {
     const sqlite = getSqlite()
 
     try {
-      // Revert financial deductions for this session
-      sqlite.prepare(`DELETE FROM payments WHERE session_id = ? AND payment_type = 'deduction'`).run(sessionId)
-      // Delete attendance records for this session
-      sqlite.prepare(`DELETE FROM attendance_records WHERE session_id = ?`).run(sessionId)
-      // Delete attendance session
-      sqlite.prepare(`DELETE FROM attendance_sessions WHERE id = ?`).run(sessionId)
-      return true
+      return sqlite.transaction(() => {
+        // Revert financial deductions for this session
+        sqlite.prepare(`
+          DELETE FROM payments
+          WHERE session_id = ? AND payment_type IN ('deduction', 'session_charge', 'refund', 'session_refund')
+        `).run(sessionId)
+        // Delete attendance records for this session
+        sqlite.prepare(`DELETE FROM attendance_records WHERE session_id = ?`).run(sessionId)
+        // Delete attendance session
+        sqlite.prepare(`DELETE FROM attendance_sessions WHERE id = ?`).run(sessionId)
+        return true
+      })()
     } catch (err) {
       log.error('Failed to delete session:', err)
       throw new Error(`Unable to delete session: ${err instanceof Error ? err.message : String(err)}`)
