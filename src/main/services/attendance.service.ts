@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, ne } from 'drizzle-orm'
 import { getDb, getSqlite, schema } from '../database/connection'
 import { AppError, ErrorCode } from '../../shared/errors/index'
 import { requireSession } from './auth.service'
@@ -794,9 +794,12 @@ export async function getRemainingSessionsCount(enrollmentId: number): Promise<n
 
   if (!enrollment) return 0
 
-  // Count total sessions for the group
+  // Count total non-cancelled sessions for the group
   const totalSessions = await db.query.attendanceSessions.findMany({
-    where: eq(schema.attendanceSessions.groupId, enrollment.groupId),
+    where: and(
+      eq(schema.attendanceSessions.groupId, enrollment.groupId),
+      ne(schema.attendanceSessions.sessionType, 'cancelled')
+    ),
   })
 
   // Count attended sessions
