@@ -7,7 +7,8 @@ import {
   startAttendanceSession, endAttendanceSession, scanQRToken,
   markManually, getSession, listSessions, lookupStudentByToken,
   getStudentSummary, getRemainingSessionsCount,
-  resolveStudentSessions, markStudentInSession, getSessionWithRoster, getStudentSessionHistory
+  resolveStudentSessions, markStudentInSession, getSessionWithRoster, getStudentSessionHistory,
+  getGroupSessionsReport
 } from '../services/attendance.service'
 import { z } from 'zod'
 
@@ -134,6 +135,13 @@ export function registerAttendanceHandlers(): void {
   handle(IPC_CHANNELS.SESSIONS_WITH_ROSTER, async (payload) => {
     const { sessionId } = z.object({ sessionId: z.number().int().positive() }).parse(payload)
     return getSessionWithRoster(sessionId)
+  })
+
+  // ─── Get group sessions report matrix ─────────────────────────────────────
+
+  handle('attendance:groupSessionsReport', async (payload) => {
+    const { groupId } = z.object({ groupId: z.number().int().positive() }).parse(payload)
+    return getGroupSessionsReport(groupId)
   })
 }
 

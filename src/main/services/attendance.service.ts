@@ -1539,6 +1539,355 @@ export async function reconcilePastSessionsAttendance(): Promise<{ reconciledCou
   return { reconciledCount }
 }
 
+// ─── Group Sessions Detailed Report (Matrix) ─────────────────────────────────
+
+export async function getGroupSessionsReport(groupId: number): Promise<{
+  group: {
+    id: number
+    name: string
+    courseId: number
+    courseNameAr: string
+    courseNameFr: string
+    teacherName: string | null
+    monthlyPrice: number
+    startDate: string
+    endDate: string | null
+    status: string
+  }
+  sessions: Array<{
+    id: number
+    sessionDate: string
+    plannedStartTime: string | null
+    actualStartTime: string | null
+    endTime: string | null
+    status: string
+    sessionType: string
+    cancelledReason: string | null
+    price: number | null
+    sessionNumber: number
+  }>
+  students: Array<{
+    studentId: number
+    enrollmentId: number
+    studentNumber: string
+    firstNameAr: string
+    lastNameAr: string
+    firstNameFr: string
+    lastNameFr: string
+    phone: string | null
+    studentStatus: string
+    enrollmentDate: string
+    agreedPrice: number
+    currentBalance: number
+    sessionData: Record<number, {
+      status: 'present' | 'absent' | 'not_active' | 'not_enrolled_yet' | 'cancelled'
+      sessionDeduction: number
+      runningBalance: number
+    }>
+    summary: {
+      presentCount: number
+      absentCount: number
+      notActiveCount: number
+      notEnrolledCount: number
+      cancelledCount: number
+      totalDeductions: number
+    }
+  }>
+  metrics: {
+    totalSessions: number
+    totalStudents: number
+    attendanceRate: number
+    totalDeductions: number
+  }
+}> {
+  const sqlite = getSqlite()
+
+  // 1. Fetch Group Details
+  const group = sqlite.prepare(`
+    SELECT g.id, g.name, g.course_id, g.teacher_id, g.monthly_price, g.start_date, g.end_date, g.status,
+           c.name_ar as course_name_ar, c.name_fr as course_name_fr,
+           t.first_name as teacher_first_name, t.last_name as teacher_last_name
+    FROM groups g
+    JOIN courses c ON g.course_id = c.id
+    LEFT JOIN teachers t ON g.teacher_id = t.id
+    WHERE g.id = ?
+  `).get(groupId) as any
+
+  if (!group) {
+    throw new AppError(ErrorCode.NOT_FOUND, 'Group not found')
+  }
+
+  // 2. Fetch Sessions that started and finished, or are marked cancelled
+  const sessionRows = sqlite.prepare(`
+    SELECT id, session_date, planned_start_time, actual_start_time, end_time,
+           status, session_type, price, late_threshold_minutes, updated_at, created_at, cancelled_reason
+    FROM attendance_sessions
+    WHERE group_id = ?
+      AND (status = 'closed' OR (actual_start_time IS NOT NULL AND end_time IS NOT NULL) OR session_type = 'cancelled')
+    ORDER BY session_date ASC, id ASC
+  `).all(groupId) as any[]
+
+  const sessions = sessionRows.map((s, idx) => ({
+    id: s.id,
+    sessionDate: s.session_date,
+    plannedStartTime: s.planned_start_time,
+    actualStartTime: s.actual_start_time,
+    endTime: s.end_time,
+    status: s.status,
+    sessionType: s.session_type,
+    cancelledReason: s.cancelled_reason ?? null,
+    price: s.price,
+    sessionNumber: idx + 1,
+    updatedAt: s.updated_at,
+    createdAt: s.created_at,
+  }))
+
+  const sessionIds = sessions.map(s => s.id)
+
+  // 3. Fetch Enrolled Students for this group
+  const enrolledStudents = sqlite.prepare(`
+    SELECT st.id as student_id, st.student_number, st.first_name_ar, st.last_name_ar,
+           st.first_name_fr, st.last_name_fr, st.phone, st.status as student_status,
+           e.id as enrollment_id, e.agreed_price, e.enrollment_date, e.created_at as enrollment_created_at,
+           e.status as enrollment_status
+    FROM enrollments e
+    JOIN students st ON e.student_id = st.id
+    WHERE e.group_id = ?
+    ORDER BY st.last_name_ar ASC, st.first_name_ar ASC
+  `).all(groupId) as any[]
+
+  const enrollmentIds = enrolledStudents.map(s => s.enrollment_id)
+
+  // 4. Fetch Attendance Records for these sessions
+  const attendanceRecordsMap = new Map<string, any>()
+  if (sessionIds.length > 0) {
+    const placeholders = sessionIds.map(() => '?').join(',')
+    const records = sqlite.prepare(`
+      SELECT session_id, student_id, attendance_status, is_inactive, scanned_at
+      FROM attendance_records
+      WHERE session_id IN (${placeholders})
+    `).all(...sessionIds) as any[]
+
+    for (const r of records) {
+      attendanceRecordsMap.set(`${r.session_id}_${r.student_id}`, r)
+    }
+  }
+
+  // 5. Fetch all payments/deductions for these enrollments
+  const paymentsByEnrollment = new Map<number, any[]>()
+  if (enrollmentIds.length > 0) {
+    const placeholders = enrollmentIds.map(() => '?').join(',')
+    const paymentRows = sqlite.prepare(`
+      SELECT id, enrollment_id, student_id, session_id, amount, payment_type, payment_date, created_at, status
+      FROM payments
+      WHERE enrollment_id IN (${placeholders}) AND status = 'paid'
+      ORDER BY payment_date ASC, created_at ASC, id ASC
+    `).all(...enrollmentIds) as any[]
+
+    for (const p of paymentRows) {
+      if (!paymentsByEnrollment.has(p.enrollment_id)) {
+        paymentsByEnrollment.set(p.enrollment_id, [])
+      }
+      paymentsByEnrollment.get(p.enrollment_id)!.push(p)
+    }
+  }
+
+  // 6. Build matrix for each student across all sessions
+  const { getEnrollmentBalance } = await import('./payment.service')
+
+  let grandTotalDeductions = 0
+  let totalPresentCount = 0
+  let totalApplicableSessions = 0
+
+  const studentResults = await Promise.all(enrolledStudents.map(async (st) => {
+    const currentBal = await getEnrollmentBalance(st.enrollment_id)
+    const enrPayments = paymentsByEnrollment.get(st.enrollment_id) || []
+
+    const sessionData: Record<number, {
+      status: 'present' | 'absent' | 'not_active' | 'not_enrolled_yet' | 'cancelled'
+      sessionDeduction: number
+      runningBalance: number
+    }> = {}
+
+    let presentCount = 0
+    let absentCount = 0
+    let notActiveCount = 0
+    let notEnrolledCount = 0
+    let cancelledCount = 0
+    let studentTotalDeductions = 0
+
+    for (const sess of sessions) {
+      const rec = attendanceRecordsMap.get(`${sess.id}_${st.student_id}`)
+
+      const wasEnrolledBefore = isEnrolledBeforeSessionClose(
+        st.enrollment_date,
+        st.enrollment_created_at,
+        sess.sessionDate,
+        sess.status,
+        sess.updatedAt || sess.createdAt
+      )
+
+      let status: 'present' | 'absent' | 'not_active' | 'not_enrolled_yet' | 'cancelled'
+
+      if (sess.sessionType === 'cancelled') {
+        status = 'cancelled'
+      } else if (rec) {
+        if (rec.is_inactive === 1 || rec.attendance_status === 'inactive' || rec.attendance_status === 'not_active') {
+          status = 'not_active'
+        } else if (rec.attendance_status === 'present' || rec.attendance_status === 'late') {
+          status = 'present'
+        } else if (rec.attendance_status === 'absent') {
+          status = 'absent'
+        } else {
+          status = wasEnrolledBefore ? 'absent' : 'not_enrolled_yet'
+        }
+      } else {
+        if (wasEnrolledBefore) {
+          status = 'absent'
+        } else {
+          status = 'not_enrolled_yet'
+        }
+      }
+
+      // Determine deduction amount for this session
+      let sessionDeduction = 0
+      if (status === 'cancelled') {
+        sessionDeduction = 0
+      } else if (status === 'present' || status === 'absent') {
+        const sessionPayment = enrPayments.find(p => p.session_id === sess.id && (p.payment_type === 'session_charge' || p.payment_type === 'deduction'))
+        if (sessionPayment) {
+          sessionDeduction = Number(sessionPayment.amount) || 0
+        } else {
+          sessionDeduction = getSessionDeductionPrice(sess.price, st.agreed_price, group.monthly_price)
+        }
+      } else {
+        sessionDeduction = 0
+      }
+
+      // Compute running balance at this session:
+      // Sum credits/top-ups on or before session date minus session charges up to this session
+      let runningBal = 0
+      for (const p of enrPayments) {
+        const pDate = p.payment_date || ''
+        const amt = Number(p.amount) || 0
+
+        // Credits / Top-ups
+        if (['credit', 'payment', 'transfer_in', 'credit_transfer_in'].includes(p.payment_type)) {
+          if (pDate <= sess.sessionDate) {
+            runningBal += amt
+          }
+        } else if (p.payment_type === 'session_refund') {
+          if (pDate <= sess.sessionDate) {
+            runningBal += amt
+          }
+        } else if (p.payment_type === 'refund' && p.session_id != null) {
+          if (pDate <= sess.sessionDate) {
+            runningBal += amt
+          }
+        } else if (['deduction', 'session_charge'].includes(p.payment_type)) {
+          // Check if this deduction was for this session or an earlier session
+          const pSess = sessions.find(s => s.id === p.session_id)
+          if (pSess ? pSess.sessionDate <= sess.sessionDate : pDate <= sess.sessionDate) {
+            runningBal -= amt
+          }
+        } else if (['transfer_out', 'credit_transfer_out', 'enrollment_refund'].includes(p.payment_type)) {
+          if (pDate <= sess.sessionDate) {
+            runningBal -= amt
+          }
+        }
+      }
+
+      if (status === 'cancelled') {
+        cancelledCount++
+      } else if (status === 'present') {
+        presentCount++
+        totalPresentCount++
+        totalApplicableSessions++
+      } else if (status === 'absent') {
+        absentCount++
+        totalApplicableSessions++
+      } else if (status === 'not_active') {
+        notActiveCount++
+      } else if (status === 'not_enrolled_yet') {
+        notEnrolledCount++
+      }
+
+      studentTotalDeductions += sessionDeduction
+      grandTotalDeductions += sessionDeduction
+
+      sessionData[sess.id] = {
+        status,
+        sessionDeduction: Math.round(sessionDeduction * 100) / 100,
+        runningBalance: Math.round(runningBal * 100) / 100,
+      }
+    }
+
+    return {
+      studentId: st.student_id,
+      enrollmentId: st.enrollment_id,
+      studentNumber: st.student_number,
+      firstNameAr: st.first_name_ar,
+      lastNameAr: st.last_name_ar,
+      firstNameFr: st.first_name_fr,
+      lastNameFr: st.last_name_fr,
+      phone: st.phone,
+      studentStatus: st.student_status,
+      enrollmentDate: st.enrollment_date,
+      agreedPrice: st.agreed_price,
+      currentBalance: currentBal.balance,
+      sessionData,
+      summary: {
+        presentCount,
+        absentCount,
+        notActiveCount,
+        notEnrolledCount,
+        cancelledCount,
+        totalDeductions: Math.round(studentTotalDeductions * 100) / 100,
+      },
+    }
+  }))
+
+  const attendanceRate = totalApplicableSessions > 0
+    ? Math.round((totalPresentCount / totalApplicableSessions) * 100)
+    : 0
+
+  return {
+    group: {
+      id: group.id,
+      name: group.name,
+      courseId: group.course_id,
+      courseNameAr: group.course_name_ar,
+      courseNameFr: group.course_name_fr,
+      teacherName: group.teacher_first_name
+        ? `${group.teacher_last_name || ''} ${group.teacher_first_name}`.trim()
+        : null,
+      monthlyPrice: group.monthly_price,
+      startDate: group.start_date,
+      endDate: group.end_date,
+      status: group.status,
+    },
+    sessions: sessions.map(s => ({
+      id: s.id,
+      sessionDate: s.sessionDate,
+      plannedStartTime: s.plannedStartTime,
+      actualStartTime: s.actualStartTime,
+      endTime: s.endTime,
+      status: s.status,
+      sessionType: s.sessionType,
+      cancelledReason: s.cancelledReason ?? null,
+      price: s.price,
+      sessionNumber: s.sessionNumber,
+    })),
+    students: studentResults,
+    metrics: {
+      totalSessions: sessions.length,
+      totalStudents: enrolledStudents.length,
+      attendanceRate,
+      totalDeductions: Math.round(grandTotalDeductions * 100) / 100,
+    },
+  }
+}
+
 // ─── Row mappers ──────────────────────────────────────────────────────────────
 
 function mapSessionRow(row: typeof schema.attendanceSessions.$inferSelect): AttendanceSession {
@@ -1571,3 +1920,4 @@ function mapRecordRow(row: typeof schema.attendanceRecords.$inferSelect): Attend
     updatedAt: row.updatedAt,
   }
 }
+

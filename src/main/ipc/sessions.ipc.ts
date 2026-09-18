@@ -467,12 +467,20 @@ export function registerSessionsHandlers(): void {
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
       // Automatic cleanup: past days open sessions with no attendance -> close or clean
-      sqlite.prepare(`
-        DELETE FROM attendance_sessions
+      const eligibleSessions = sqlite.prepare(`
+        SELECT id FROM attendance_sessions
         WHERE session_date < ?
           AND status = 'open'
           AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records WHERE attendance_status IN ('present', 'late'))
-      `).run(today)
+          AND id NOT IN (SELECT DISTINCT session_id FROM payments WHERE session_id IS NOT NULL)
+      `).all(today) as { id: number }[]
+
+      if (eligibleSessions.length > 0) {
+        const ids = eligibleSessions.map(s => s.id)
+        const placeholders = ids.map(() => '?').join(',')
+        sqlite.prepare(`DELETE FROM attendance_records WHERE session_id IN (${placeholders})`).run(...ids)
+        sqlite.prepare(`DELETE FROM attendance_sessions WHERE id IN (${placeholders})`).run(...ids)
+      }
 
       sqlite.prepare(`
         UPDATE attendance_sessions

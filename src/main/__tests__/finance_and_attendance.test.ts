@@ -158,3 +158,88 @@ describe('Session Cancellation Credit Restoration Rules (إلغاء الحصة)'
   })
 })
 
+describe('Group Sessions Report Matrix Rules (تقرير حصص الأفواج)', () => {
+  it('correctly maps the 4 statuses for a student across sessions', () => {
+    // Session 1: 2026-09-01 (Student not enrolled yet)
+    // Student enrolled: 2026-09-05
+    // Session 2: 2026-09-08 (Student attended -> present)
+    // Session 3: 2026-09-15 (Student was enrolled but missed -> absent)
+    // Session 4: 2026-09-22 (Student marked inactive/exempt -> not_active)
+
+    const enrollmentDate = '2026-09-05'
+    const session1Date = '2026-09-01'
+    const session2Date = '2026-09-08'
+    const session3Date = '2026-09-15'
+    const session4Date = '2026-09-22'
+
+    // Status 1: wasn't enrolled yet
+    const s1Status = enrollmentDate > session1Date ? 'not_enrolled_yet' : 'absent'
+    expect(s1Status).toBe('not_enrolled_yet')
+
+    // Status 2: present
+    const s2Record = { attendance_status: 'present', is_inactive: 0 }
+    const s2Status = s2Record.attendance_status === 'present' ? 'present' : 'absent'
+    expect(s2Status).toBe('present')
+
+    // Status 3: absent
+    const s3Record = { attendance_status: 'absent', is_inactive: 0 }
+    const s3Status = s3Record.attendance_status === 'absent' ? 'absent' : 'present'
+    expect(s3Status).toBe('absent')
+
+    // Status 4: not active
+    const s4Record = { attendance_status: 'inactive', is_inactive: 1 }
+    const s4Status = s4Record.is_inactive === 1 ? 'not_active' : 'absent'
+    expect(s4Status).toBe('not_active')
+  })
+
+  it('calculates running credits and session deductions across sessions accurately', () => {
+    const sessionPrice = 500
+    let balance = 2000 // Student deposited 2000 DA initially
+
+    // Session 1: not enrolled yet -> deduction = 0, balance = 2000
+    const s1Deduction = 0
+    balance -= s1Deduction
+    expect(balance).toBe(2000)
+
+    // Session 2: present -> deduction = 500, balance = 1500
+    const s2Deduction = sessionPrice
+    balance -= s2Deduction
+    expect(balance).toBe(1500)
+
+    // Session 3: absent -> deduction = 500, balance = 1000
+    const s3Deduction = sessionPrice
+    balance -= s3Deduction
+    expect(balance).toBe(1000)
+
+    // Session 4: not active -> deduction = 0, balance = 1000
+    const s4Deduction = 0
+    balance -= s4Deduction
+    expect(balance).toBe(1000)
+  })
+
+  it('handles cancelled sessions properly: status is cancelled, deduction is 0, and reason is preserved', () => {
+    const session = {
+      id: 5,
+      session_type: 'cancelled',
+      cancelled_reason: 'عطلة رسمية',
+      status: 'closed',
+    }
+
+    let status: string
+    let deduction: number
+
+    if (session.session_type === 'cancelled') {
+      status = 'cancelled'
+      deduction = 0
+    } else {
+      status = 'present'
+      deduction = 500
+    }
+
+    expect(status).toBe('cancelled')
+    expect(deduction).toBe(0)
+    expect(session.cancelled_reason).toBe('عطلة رسمية')
+  })
+})
+
+

@@ -162,6 +162,8 @@ const api = {
       invoke<any[]>('attendance:studentSessionHistory', { studentId }),
     withRoster: (sessionId: number) =>
       invoke<any>(IPC_CHANNELS.SESSIONS_WITH_ROSTER, { sessionId }),
+    groupSessionsReport: (groupId: number) =>
+      invoke<any>('attendance:groupSessionsReport', { groupId }),
   },
 
   schedules: {
