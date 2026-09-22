@@ -114,7 +114,7 @@ export default function Payments() {
   const [debtReport, setDebtReport] = useState<any[]>([])
   const [schoolSettings, setSchoolSettings] = useState<any | null>(null)
 
-  const [summary, setSummary] = useState({ monthRevenue: 0, todayCollected: 0, outstanding: 0, overdue: 0 })
+  const [summary, setSummary] = useState({ monthRevenue: 0, todayCollected: 0, outstanding: 0, overdue: 0, totalDebt: 0, pendingCollections: 0 })
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [debtFilter, setDebtFilter] = useState<'all' | 'overdue' | 'up_to_date'>('all')
@@ -315,18 +315,18 @@ export default function Payments() {
           iconBg="bg-emerald-50"
         />
         <StatCard
-          title="إجمالي الديون المعلقة"
-          value={`${summary.outstanding.toLocaleString('ar-DZ')} دج`}
-          change="مستحقات على الطلاب"
+          title="التحصيلات المعلقة"
+          value={`${(summary.pendingCollections ?? summary.outstanding).toLocaleString('ar-DZ')} دج`}
+          change="مستحقات الاشتراكات المعلقة"
           icon={AlertCircle}
           iconColor="text-amber-600"
           iconBg="bg-amber-50"
         />
         <StatCard
-          title="الطلاب المتأخرون عن الدفع"
-          value={summary.overdue}
-          change="بحاجة إلى تذكير"
-          icon={Users}
+          title="ديون متراكمة"
+          value={`${(summary.totalDebt ?? 0).toLocaleString('ar-DZ')} دج`}
+          change="ديون فعلية متراكمة"
+          icon={AlertCircle}
           iconColor="text-rose-500"
           iconBg="bg-rose-50"
         />

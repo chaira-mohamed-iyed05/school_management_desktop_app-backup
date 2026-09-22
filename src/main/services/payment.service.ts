@@ -743,25 +743,15 @@ export async function calculateStudentTuitionDebt(studentId: number): Promise<{
   const enrollmentDetails: any[] = []
 
   for (const en of enrollments) {
-    const start = en.enrollment_date || en.group_start_date
-    const months = calculateMonthsElapsed(start, en.group_end_date)
     const agreedPrice = Number(en.agreed_price) || 0
-    const totalDue = months * agreedPrice
-
-    const paidRow = sqlite.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as paid
-      FROM payments
-      WHERE enrollment_id = ? AND payment_type = 'credit' AND status = 'paid'
-    `).get(en.id) as any
-
-    const totalPaid = Number(paidRow?.paid ?? 0)
-    const balance = totalPaid - totalDue
+    const balInfo = await getEnrollmentBalance(en.id)
+    const balance = balInfo.balance
     const debt = balance < 0 ? Math.abs(balance) : 0
-    const monthsOverdue = agreedPrice > 0 ? Math.ceil(debt / agreedPrice) : 0
+    const monthsOverdue = agreedPrice > 0 ? Math.ceil(debt / agreedPrice) : (debt > 0 ? 1 : 0)
     const status = debt > 0 ? 'overdue' : (balance > 0 ? 'advance' : 'up_to_date')
 
-    totalStudentDue += totalDue
-    totalStudentPaid += totalPaid
+    totalStudentDue += balInfo.totalDeducted
+    totalStudentPaid += balInfo.totalCharged
 
     enrollmentDetails.push({
       enrollmentId: en.id,
@@ -770,9 +760,9 @@ export async function calculateStudentTuitionDebt(studentId: number): Promise<{
       courseName: en.course_name_fr || en.course_name_ar,
       agreedPrice,
       enrollmentDate: en.enrollment_date,
-      monthsBilled: months,
-      totalDue,
-      totalPaid,
+      monthsBilled: 0,
+      totalDue: balInfo.totalDeducted,
+      totalPaid: balInfo.totalCharged,
       balance,
       debt,
       monthsOverdue,
@@ -787,9 +777,9 @@ export async function calculateStudentTuitionDebt(studentId: number): Promise<{
 
   return {
     studentId,
-    totalDebt,
-    totalPaid: totalStudentPaid,
-    totalDue: totalStudentDue,
+    totalDebt: Math.round(totalDebt * 100) / 100,
+    totalPaid: Math.round(totalStudentPaid * 100) / 100,
+    totalDue: Math.round(totalStudentDue * 100) / 100,
     monthsOverdue: maxMonthsOverdue,
     status: overallStatus,
     enrollments: enrollmentDetails,
@@ -842,13 +832,15 @@ export async function getStudentsDebtReport(): Promise<any[]> {
   return report
 }
 
-// ─── Payment summary for dashboard (using calendar month debt engine) ────────
+// ─── Payment summary for dashboard & payments page ───────────────────────────
 
 export async function getPaymentsSummary(): Promise<{
   monthRevenue: number
   todayCollected: number
   outstanding: number
   overdue: number
+  totalDebt: number
+  pendingCollections: number
 }> {
   const sqlite = getSqlite()
   const now = new Date()
@@ -865,16 +857,53 @@ export async function getPaymentsSummary(): Promise<{
     WHERE payment_type='credit' AND status='paid' AND payment_date = ?
   `).get(today) as any)?.total ?? 0
 
-  // Calculate real outstanding tuition debt across all active students
-  const debtReport = await getStudentsDebtReport()
-  const totalOutstandingDebt = debtReport.reduce((acc, item) => acc + item.totalDebt, 0)
-  const totalOverdueStudentsCount = debtReport.filter(item => item.totalDebt > 0).length
+  // 1. ديون متراكمة (Total current debts):
+  // Sum of all negative balances across all active students
+  const allStudents = sqlite.prepare(`
+    SELECT id FROM students WHERE status = 'active'
+  `).all() as { id: number }[]
+
+  let totalDebt = 0
+  let overdueStudentsCount = 0
+
+  for (const s of allStudents) {
+    const sBal = await getStudentBalance(s.id)
+    if (sBal.totalDebt > 0) {
+      totalDebt += sBal.totalDebt
+      overdueStudentsCount++
+    }
+  }
+
+  // 2. التحصيلات المعلقة (Pending collections):
+  // Only the sum when the credit of the student is = 0 and he is still enrolled into that group (monthly inscription of the course)
+  const activeEnrollments = sqlite.prepare(`
+    SELECT e.id as enrollment_id, e.student_id, e.agreed_price, g.monthly_price
+    FROM enrollments e
+    JOIN students s ON e.student_id = s.id
+    JOIN groups g ON e.group_id = g.id
+    WHERE e.status = 'active' AND s.status = 'active'
+  `).all() as any[]
+
+  let pendingCollections = 0
+
+  for (const enr of activeEnrollments) {
+    const balInfo = await getEnrollmentBalance(enr.enrollment_id)
+    if (balInfo.balance === 0) {
+      const monthlyFee = Number(enr.agreed_price) || Number(enr.monthly_price) || 0
+      pendingCollections += monthlyFee
+    }
+  }
+
+  totalDebt = Math.round(totalDebt * 100) / 100
+  pendingCollections = Math.round(pendingCollections * 100) / 100
 
   return {
     monthRevenue: monthCredit,
     todayCollected: todayCredit,
-    outstanding: totalOutstandingDebt,
-    overdue: totalOverdueStudentsCount,
+    outstanding: pendingCollections,
+    pendingCollections,
+    totalDebt,
+    overdue: overdueStudentsCount,
   }
 }
 

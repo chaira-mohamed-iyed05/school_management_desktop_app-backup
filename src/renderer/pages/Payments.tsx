@@ -15,6 +15,8 @@ interface PaymentSummary {
   todayCollected: number
   outstanding: number
   overdue: number
+  totalDebt?: number
+  pendingCollections?: number
 }
 
 // Convert Eastern Arabic numerals (٠-٩) and Persian numerals (۰-۹) to standard ASCII (0-9)
@@ -224,7 +226,7 @@ export default function Payments() {
   const confirm = useConfirm()
 
   const [payments, setPayments] = useState<any[]>([])
-  const [summary, setSummary] = useState<PaymentSummary>({ monthRevenue: 0, todayCollected: 0, outstanding: 0, overdue: 0 })
+  const [summary, setSummary] = useState<PaymentSummary>({ monthRevenue: 0, todayCollected: 0, outstanding: 0, overdue: 0, totalDebt: 0, pendingCollections: 0 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -533,14 +535,14 @@ export default function Payments() {
             <Clock size={14} className="text-amber-500" />
             <p className="text-xs text-slate-400 font-medium">{t('payments.outstanding')}</p>
           </div>
-          <p className="text-2xl font-bold text-amber-600">{summary.outstanding.toLocaleString()} DA</p>
+          <p className="text-2xl font-bold text-amber-600">{(summary.pendingCollections ?? summary.outstanding ?? 0).toLocaleString()} DA</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-border shadow-xs">
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle size={14} className="text-red-500" />
-            <p className="text-xs text-slate-400 font-medium">{lang === 'ar' ? 'ديون متراكمة' : lang === 'en' ? 'Outstanding Debt' : 'Dettes en cours'}</p>
+            <p className="text-xs text-slate-400 font-medium">{lang === 'ar' ? 'ديون متراكمة' : lang === 'en' ? 'Accumulated Debt' : 'Dettes accumulées'}</p>
           </div>
-          <p className="text-2xl font-bold text-red-600">{summary.outstanding.toLocaleString()} DA</p>
+          <p className="text-2xl font-bold text-red-600">{(summary.totalDebt ?? 0).toLocaleString()} DA</p>
         </div>
       </div>
 

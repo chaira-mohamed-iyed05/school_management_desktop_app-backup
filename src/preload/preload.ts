@@ -214,7 +214,7 @@ const api = {
     byStudent: (studentId: number) =>
       invoke<any[]>(IPC_CHANNELS.PAYMENTS_BY_STUDENT, { studentId }),
     summary: () =>
-      invoke<{ monthRevenue: number; todayCollected: number; outstanding: number; overdue: number }>('payments:summary'),
+      invoke<{ monthRevenue: number; todayCollected: number; outstanding: number; overdue: number; totalDebt: number; pendingCollections: number }>('payments:summary'),
     debtReport: () =>
       invoke<any[]>('payments:debtReport'),
     studentDebt: (studentId: number) =>

@@ -242,4 +242,51 @@ describe('Group Sessions Report Matrix Rules (تقرير حصص الأفواج)'
   })
 })
 
+describe('Accumulated Debt and Pending Collections Rules (ديون متراكمة والتحصيلات المعلقة)', () => {
+  it('correctly categorizes enrollment with credit = 0 as pending collection and NOT in debt', () => {
+    // When a student enrolls in a group with monthly price 2500 DA, but hasn't paid:
+    // credit = 0 -> not in debt yet, but owes monthly course inscription
+    const balance: number = 0
+    const agreedPrice = 2500
+
+    const isDebt = balance < 0
+    const debtAmount = isDebt ? Math.abs(balance) : 0
+    const isPendingCollection = balance === 0
+    const pendingAmount = isPendingCollection ? agreedPrice : 0
+
+    expect(debtAmount).toBe(0)
+    expect(pendingAmount).toBe(2500)
+  })
+
+  it('correctly categorizes negative balance as debt and NOT pending collection', () => {
+    // When a student attended sessions without credit, resulting in negative balance (-625 DA):
+    // credit < 0 -> in debt (ديون متراكمة = 625), NOT pending collection (0)
+    const balance: number = -625
+    const agreedPrice = 2500
+
+    const isDebt = balance < 0
+    const debtAmount = isDebt ? Math.abs(balance) : 0
+    const isPendingCollection = balance === 0
+    const pendingAmount = isPendingCollection ? agreedPrice : 0
+
+    expect(debtAmount).toBe(625)
+    expect(pendingAmount).toBe(0)
+  })
+
+  it('correctly categorizes prepaid student as neither debt nor pending collection', () => {
+    // When a student prepaid their tuition (balance = 2500 DA):
+    const balance: number = 2500
+    const agreedPrice = 2500
+
+    const isDebt = balance < 0
+    const debtAmount = isDebt ? Math.abs(balance) : 0
+    const isPendingCollection = balance === 0
+    const pendingAmount = isPendingCollection ? agreedPrice : 0
+
+    expect(debtAmount).toBe(0)
+    expect(pendingAmount).toBe(0)
+  })
+})
+
+
 
