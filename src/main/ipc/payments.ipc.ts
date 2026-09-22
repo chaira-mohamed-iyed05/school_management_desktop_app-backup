@@ -2,7 +2,8 @@ import { handle } from './_handler'
 import { IPC_CHANNELS } from '../../shared/constants/index'
 import {
   listPayments, createPayment, cancelPayment, getPaymentsByStudent,
-  topUpCredit, deductSession, transferBalance, refundEnrollment,
+  topUpCredit, topUpMultipleCredit, getPaymentReceiptDetails,
+  deductSession, transferBalance, refundEnrollment,
   cancelEnrollment,
   getEnrollmentBalance, getStudentBalance, getPaymentsSummary,
   getStudentsDebtReport, calculateStudentTuitionDebt,
@@ -136,4 +137,28 @@ export function registerPaymentHandlers(): void {
     }).parse(payload ?? {})
     return listPayments({ ...opts, allTypes: true })
   })
+
+  // Multi-course payment in a single transaction (consolidated receipt)
+  handle('payments:topUpMultiple', async (payload) => {
+    const data = z.object({
+      studentId: z.number().int().positive(),
+      items: z.array(z.object({
+        enrollmentId: z.number().int().positive().optional(),
+        newGroupId: z.number().int().positive().optional(),
+        amount: z.number().positive(),
+      })).min(1),
+      paymentMethod: z.enum(['cash', 'transfer', 'check']),
+      paymentDate: z.string(),
+      reference: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    }).parse(payload)
+    return topUpMultipleCredit(data)
+  })
+
+  // Get consolidated receipt details (supports multi-item receipts)
+  handle('payments:receiptDetails', async (payload) => {
+    const { paymentId } = z.object({ paymentId: z.number().int().positive() }).parse(payload)
+    return getPaymentReceiptDetails(paymentId)
+  })
 }
+

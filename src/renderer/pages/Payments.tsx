@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import {
@@ -219,6 +219,17 @@ function StudentCombobox({
   )
 }
 
+interface CoursePaymentItem {
+  enrollmentId: number
+  groupId: number
+  courseName: string
+  groupName: string
+  agreedPrice: number
+  balance: number
+  selected: boolean
+  amount: string
+}
+
 export default function Payments() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language as 'ar' | 'fr' | 'en'
@@ -243,6 +254,29 @@ export default function Payments() {
   const [receiptQrDataUrl, setReceiptQrDataUrl] = useState<string | null>(null)
   const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
+
+  // Multi-course payment state
+  const [courseItems, setCourseItems] = useState<CoursePaymentItem[]>([])
+  const [showAddGroupSection, setShowAddGroupSection] = useState(false)
+  const [newGroupItem, setNewGroupItem] = useState<{ groupId: string; amount: string; selected: boolean }>({
+    groupId: '',
+    amount: '',
+    selected: false,
+  })
+
+  // Dynamic grand total calculation
+  const totalPaymentAmount = useMemo(() => {
+    let sum = 0
+    for (const item of courseItems) {
+      if (item.selected) {
+        sum += Number(item.amount) || 0
+      }
+    }
+    if (newGroupItem.selected && newGroupItem.groupId) {
+      sum += Number(newGroupItem.amount) || 0
+    }
+    return sum
+  }, [courseItems, newGroupItem])
 
   // Transfer/Refund modals
   const [showTransfer, setShowTransfer] = useState<{ enrollmentId: number; studentId: number; balance: number } | null>(null)
@@ -294,13 +328,19 @@ export default function Payments() {
     }
 
     const schoolTitle = schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت'
+    const coursesSummary = receiptModal.items && receiptModal.items.length > 0
+      ? receiptModal.items.map((it: any) => `${it.courseName || ''} (${it.groupName || ''}): ${Number(it.amount).toLocaleString()} DA`).join(' | ')
+      : [receiptModal.courseName, receiptModal.groupName].filter(Boolean).join(' ')
+
+    const totalAmt = Number(receiptModal.totalAmount ?? receiptModal.amount) || 0
+
     const qrLines = [
       schoolTitle,
       `Reçu: ${receiptModal.receiptNumber || ''}`,
       receiptModal.studentName ? `Élève: ${receiptModal.studentName}` : null,
       receiptModal.studentNumber ? `Matricule: ${receiptModal.studentNumber}` : null,
-      receiptModal.courseName || receiptModal.groupName ? `Groupe: ${[receiptModal.courseName, receiptModal.groupName].filter(Boolean).join(' ')}` : null,
-      `Montant: ${receiptModal.amount} DA`,
+      coursesSummary ? `Cours: ${coursesSummary}` : null,
+      `Montant: ${totalAmt.toLocaleString()} DA`,
       `Date: ${receiptModal.paymentDate || ''}`,
     ].filter(Boolean)
 
@@ -351,16 +391,48 @@ export default function Payments() {
     setError('')
     setEnrollmentBalance(null)
     setForm((f) => ({ ...f, studentId: sid, enrollmentId: '', newGroupId: '', amount: '' }))
-    if (!sid) { setEnrollments([]); return }
+    setShowAddGroupSection(false)
+    setNewGroupItem({ groupId: '', amount: '', selected: false })
+    if (!sid) {
+      setEnrollments([])
+      setCourseItems([])
+      return
+    }
+
     const res = await window.schoolApp.enrollments.byStudent(Number(sid))
     if (res.success && res.data && res.data.length > 0) {
       setEnrollments(res.data)
-      const first = res.data[0]
-      setForm((f) => ({ ...f, studentId: sid, enrollmentId: String(first.id), newGroupId: '', amount: String(first.agreedPrice || '') }))
-      loadBalance(first.id)
+      const items: CoursePaymentItem[] = []
+      for (const enr of res.data) {
+        let bal = 0
+        try {
+          const bRes = await window.schoolApp.payments.balance(enr.id)
+          if (bRes.success && bRes.data) bal = bRes.data.balance
+        } catch {}
+        items.push({
+          enrollmentId: enr.id,
+          groupId: enr.groupId,
+          courseName: enr.courseName || '',
+          groupName: enr.groupName || '',
+          agreedPrice: enr.agreedPrice || 0,
+          balance: bal,
+          selected: true,
+          amount: String(enr.agreedPrice || ''),
+        })
+      }
+      setCourseItems(items)
+      setShowAddGroupSection(false)
     } else {
       setEnrollments([])
-      if (groups.length > 0) setForm((f) => ({ ...f, studentId: sid, enrollmentId: '', newGroupId: String(groups[0].id), amount: String(groups[0].monthlyPrice || '') }))
+      setCourseItems([])
+      setShowAddGroupSection(true)
+      if (groups.length > 0) {
+        setNewGroupItem({
+          groupId: String(groups[0].id),
+          amount: String(groups[0].monthlyPrice || ''),
+          selected: true,
+        })
+      }
     }
   }
 
@@ -395,63 +467,65 @@ export default function Payments() {
     }
     setForm(defaultForm)
     setEnrollments([])
+    setCourseItems([])
+    setShowAddGroupSection(false)
+    setNewGroupItem({ groupId: '', amount: '', selected: false })
     setError('')
     setShowForm(true)
 
     // If a student is pre-selected, auto-load their enrollments
     if (preselectedStudentId) {
-      const res = await window.schoolApp.enrollments.byStudent(Number(preselectedStudentId))
-      if (res.success && res.data && res.data.length > 0) {
-        setEnrollments(res.data)
-        const first = res.data[0]
-        setForm((f) => ({
-          ...f,
-          enrollmentId: String(first.id),
-          amount: String(first.agreedPrice || ''),
-        }))
-      }
+      handleStudentChange(preselectedStudentId)
     }
   }
 
   const handleSave = async () => {
     if (!form.studentId) { setError(t('payments.student') + ' requis'); return }
-    if (!form.enrollmentId && !form.newGroupId) { setError(t('payments.groupOrCourseRequired')); return }
-    if (!form.amount || Number(form.amount) <= 0) { setError(t('payments.amount') + ' requis'); return }
+
+    const selectedCourses = courseItems.filter((c) => c.selected && Number(c.amount) > 0)
+    const hasNewGroup = newGroupItem.selected && newGroupItem.groupId && Number(newGroupItem.amount) > 0
+
+    if (selectedCourses.length === 0 && !hasNewGroup) {
+      setError(lang === 'ar' ? 'يرجى تحديد مادة واحدة على الأقل بمبلغ دفع صحيح' : 'Veuillez sélectionner au moins une matière avec un montant valide')
+      return
+    }
+
     setSaving(true); setError('')
     try {
-      let finalEnrollmentId = Number(form.enrollmentId)
-      if (!finalEnrollmentId && form.newGroupId) {
-        const er = await window.schoolApp.enrollments.create({ studentId: Number(form.studentId), groupId: Number(form.newGroupId), agreedPrice: Number(form.amount), enrollmentDate: form.paymentDate })
-        if (!er.success) { setError(er.error ?? t('common.error')); return }
-        finalEnrollmentId = er.data.id
+      const itemsPayload: Array<{ enrollmentId?: number; newGroupId?: number; amount: number }> = [
+        ...selectedCourses.map((c) => ({ enrollmentId: c.enrollmentId, amount: Number(c.amount) })),
+      ]
+      if (hasNewGroup) {
+        itemsPayload.push({ newGroupId: Number(newGroupItem.groupId), amount: Number(newGroupItem.amount) })
       }
-      // Use topUp (credit model)
-      const res = await window.schoolApp.payments.topUp({
+
+      const res = await window.schoolApp.payments.topUpMultiple({
         studentId: Number(form.studentId),
-        enrollmentId: finalEnrollmentId,
-        amount: Number(form.amount),
+        items: itemsPayload,
         paymentMethod: form.paymentMethod as 'cash' | 'transfer' | 'check',
         paymentDate: form.paymentDate,
         reference: form.reference.trim() || null,
         notes: form.notes.trim() || null,
       })
-      if (!res.success) { setError(res.error ?? t('common.error')) }
-      else {
+
+      if (!res.success) {
+        setError(res.error ?? t('common.error'))
+      } else {
         setShowForm(false)
         const selectedStudent = students.find((s) => s.id === Number(form.studentId))
-        const selectedEnr = enrollments.find((e) => e.id === finalEnrollmentId)
         const enrichedReceipt = {
           ...res.data,
           studentName: selectedStudent ? getStudentLabel(selectedStudent) : res.data?.studentName,
           studentNumber: selectedStudent?.studentNumber ?? res.data?.studentNumber,
-          groupName: selectedEnr?.groupName ?? res.data?.groupName,
-          courseName: selectedEnr?.courseName ?? res.data?.courseName,
         }
         setReceiptModal(enrichedReceipt)
         await load()
       }
-    } catch (err: any) { setError(err?.message ?? t('common.error')) }
-    finally { setSaving(false) }
+    } catch (err: any) {
+      setError(err?.message ?? t('common.error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleTransfer = async () => {
@@ -628,7 +702,22 @@ export default function Payments() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-end flex gap-2 justify-end">
-                    <button onClick={() => setReceiptModal(p)} className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const details = await window.schoolApp.payments.receiptDetails(p.id)
+                          if (details?.success && details.data) {
+                            setReceiptModal(details.data)
+                          } else {
+                            setReceiptModal(p)
+                          }
+                        } catch {
+                          setReceiptModal(p)
+                        }
+                      }}
+                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                      title={t('payments.printReceipt')}
+                    >
                       <Printer size={12} />
                     </button>
                     {p.status === 'paid' && p.paymentType === 'credit' && (
@@ -651,7 +740,7 @@ export default function Payments() {
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
 
-            <div className="space-y-3.5">
+            <div className="space-y-4">
               {/* Student Selector — searchable combobox */}
               <div>
                 <label className={labelCls}>{t('payments.student')} *</label>
@@ -664,77 +753,172 @@ export default function Payments() {
                 />
               </div>
 
-              {/* Course & Group Selector (Enrollment) */}
+              {/* Course & Group Selection for Payment */}
               {form.studentId && (
-                <div>
-                  <label className={labelCls}>{t('payments.courseAndGroup')} *</label>
-                  {enrollments.length > 0 ? (
-                    <select className={inputCls} value={form.enrollmentId} onChange={(e) => handleEnrollmentChange(e.target.value)}>
-                      <option value="">{t('payments.selectCourseGroup')}</option>
-                      {enrollments.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.courseName ? `${e.courseName} — ` : ''}{e.groupName ?? `${t('courses.groups')} #${e.groupId}`} ({e.agreedPrice.toLocaleString()} DA)
-                        </option>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                    <span>{lang === 'ar' ? 'المواد والأفواج للتسديد' : 'Matières à payer'}</span>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {lang === 'ar' ? 'حدد المواد المراد دفعها' : 'Cochez les matières'}
+                    </span>
+                  </div>
+
+                  {courseItems.length > 0 ? (
+                    <div className="space-y-2 max-h-56 overflow-y-auto p-1 divide-y divide-slate-100 bg-slate-50/50 rounded-xl border border-border">
+                      {courseItems.map((ci, idx) => (
+                        <div
+                          key={ci.enrollmentId}
+                          className={`p-2.5 rounded-lg transition-all ${
+                            ci.selected ? 'bg-white shadow-xs border border-indigo-200/80 ring-1 ring-indigo-500/10' : 'bg-transparent opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={ci.selected}
+                              onChange={(e) => {
+                                const checked = e.target.checked
+                                setCourseItems((prev) => prev.map((item, i) => i === idx ? { ...item, selected: checked } : item))
+                              }}
+                              className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              id={`course-item-${ci.enrollmentId}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <label htmlFor={`course-item-${ci.enrollmentId}`} className="font-bold text-xs text-[#0F172A] truncate cursor-pointer">
+                                  {ci.courseName} <span className="text-slate-500 font-normal text-[11px]">({ci.groupName})</span>
+                                </label>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${
+                                  ci.balance < 0 ? 'bg-red-100 text-red-700' : ci.balance === 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {ci.balance < 0 ? `${lang === 'ar' ? 'دين' : 'Dette'}: ${Math.abs(ci.balance).toLocaleString()} DA` : `${lang === 'ar' ? 'رصيد' : 'Solde'}: ${ci.balance.toLocaleString()} DA`}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-3 mt-2">
+                                <div className="text-[11px] text-slate-500">
+                                  {lang === 'ar' ? 'الاشتراك:' : 'Tarif:'} <span className="font-semibold text-slate-700">{ci.agreedPrice.toLocaleString()} DA</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 w-32">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    disabled={!ci.selected}
+                                    value={ci.amount}
+                                    onChange={(e) => {
+                                      const val = normalizeNumberInput(e.target.value)
+                                      setCourseItems((prev) => prev.map((item, i) => i === idx ? { ...item, amount: val } : item))
+                                    }}
+                                    className={`w-full px-2 py-1 text-xs border rounded-lg text-end font-semibold ${
+                                      ci.selected ? 'bg-white border-indigo-300 text-[#0F172A] focus:ring-1 focus:ring-indigo-500' : 'bg-slate-100 border-slate-200 text-slate-400'
+                                    }`}
+                                    placeholder="0"
+                                    dir="ltr"
+                                  />
+                                  <span className="text-[10px] text-slate-400 font-bold shrink-0">DA</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </select>
+                    </div>
                   ) : (
-                    <div className="space-y-2 p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs">
-                      <div className="flex items-center gap-1.5 text-amber-800 font-medium">
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs">
+                      <div className="flex items-center gap-1.5 text-amber-800 font-medium mb-1.5">
                         <AlertCircle size={14} className="shrink-0" />
                         <span>{t('payments.notEnrolledYet')}</span>
                       </div>
-                      <select className={inputCls} value={form.newGroupId} onChange={(e) => handleNewGroupChange(e.target.value)}>
-                        <option value="">{t('payments.selectCourseGroup')}</option>
-                        {groups.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {getCourseGroupName(g.courseId, g.name)} ({g.monthlyPrice.toLocaleString()} DA)
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Balance info with Transfer & Refund actions */}
-              {enrollmentBalance && form.enrollmentId && (
-                <div className={`p-3 rounded-xl border text-xs flex flex-col gap-2 ${
-                  enrollmentBalance.balance < 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span>{lang === 'ar' ? 'الرصيد الحالي لهذا المادة' : lang === 'en' ? 'Current balance for this course' : 'Solde pour cette matière'}:</span>
-                    <span className="font-bold text-base">{enrollmentBalance.balance.toLocaleString()} DA</span>
+                  {/* Enroll and pay for another group */}
+                  <div className="pt-1">
+                    {!showAddGroupSection ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddGroupSection(true)
+                          setNewGroupItem({
+                            groupId: groups[0]?.id ? String(groups[0].id) : '',
+                            amount: groups[0]?.monthlyPrice ? String(groups[0].monthlyPrice) : '',
+                            selected: true,
+                          })
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Plus size={13} /> {lang === 'ar' ? '+ تسجيل ودفع لفوج إضافي' : '+ Inscrire & payer pour un autre groupe'}
+                      </button>
+                    ) : (
+                      <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-200 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-indigo-900">{lang === 'ar' ? 'فوج إضافي جديد:' : 'Nouveau groupe:'}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddGroupSection(false)
+                              setNewGroupItem({ groupId: '', amount: '', selected: false })
+                            }}
+                            className="text-slate-400 hover:text-slate-600 text-[11px]"
+                          >
+                            {t('common.cancel')}
+                          </button>
+                        </div>
+                        <select
+                          className={inputCls}
+                          value={newGroupItem.groupId}
+                          onChange={(e) => {
+                            const grpId = e.target.value
+                            const found = groups.find((g) => g.id === Number(grpId))
+                            setNewGroupItem({
+                              groupId: grpId,
+                              amount: found ? String(found.monthlyPrice || '') : newGroupItem.amount,
+                              selected: true,
+                            })
+                          }}
+                        >
+                          <option value="">{t('payments.selectCourseGroup')}</option>
+                          {groups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {getCourseGroupName(g.courseId, g.name)} ({g.monthlyPrice.toLocaleString()} DA)
+                            </option>
+                          ))}
+                        </select>
+                        {newGroupItem.groupId && (
+                          <div className="flex items-center justify-between gap-3 pt-1">
+                            <span className="text-slate-600 text-[11px]">{lang === 'ar' ? 'مبلغ الفوج الجديد:' : 'Montant:'}</span>
+                            <div className="flex items-center gap-1.5 w-32">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={newGroupItem.amount}
+                                onChange={(e) => setNewGroupItem((prev) => ({ ...prev, amount: normalizeNumberInput(e.target.value) }))}
+                                className="w-full px-2 py-1 text-xs border rounded-lg text-end font-semibold bg-white border-indigo-300"
+                                placeholder="0"
+                                dir="ltr"
+                              />
+                              <span className="text-[10px] text-slate-400 font-bold shrink-0">DA</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {enrollmentBalance.balance > 0 && (
-                    <div className="flex gap-2 pt-1 border-t border-emerald-200/60 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setShowTransfer({ enrollmentId: Number(form.enrollmentId), studentId: Number(form.studentId), balance: enrollmentBalance.balance })}
-                        className="px-2.5 py-1 bg-teal-600 text-white rounded text-[11px] font-semibold hover:bg-teal-700 transition-colors"
-                      >
-                        {lang === 'ar' ? 'تحويل الرصيد' : lang === 'en' ? 'Transfer' : 'Transférer'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowRefund({ enrollmentId: Number(form.enrollmentId), studentId: Number(form.studentId), balance: enrollmentBalance.balance })}
-                        className="px-2.5 py-1 bg-red-600 text-white rounded text-[11px] font-semibold hover:bg-red-700 transition-colors"
-                      >
-                        {lang === 'ar' ? 'إلغاء واسترداد' : lang === 'en' ? 'Cancel & Refund' : 'Annuler & Rembourser'}
-                      </button>
+
+                  {/* Grand Total Display */}
+                  <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl flex items-center justify-between shadow-2xs mt-2">
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={16} className="text-[#2563EB]" />
+                      <span className="text-xs font-bold text-slate-800">
+                        {lang === 'ar' ? 'المبلغ الإجمالي المطلوب دفعه:' : 'Montant total à payer:'}
+                      </span>
                     </div>
-                  )}
+                    <span className="text-base font-extrabold text-[#2563EB] font-mono">
+                      {totalPaymentAmount.toLocaleString()} DA
+                    </span>
+                  </div>
                 </div>
               )}
-              {/* Amount */}
-              <div>
-                <label className={labelCls}>{lang === 'ar' ? 'مبلغ الشحن (DA)' : lang === 'en' ? 'Credit Amount (DA)' : 'Montant à créditer (DA)'} *</label>
-                <input
-                  type="text" inputMode="decimal" className={inputCls}
-                  value={form.amount}
-                  onChange={(e) => setForm((f) => ({ ...f, amount: normalizeNumberInput(e.target.value) }))}
-                  placeholder="0" dir="ltr"
-                />
-              </div>
 
               {/* Payment Method & Date */}
               <div className="grid grid-cols-2 gap-2">
@@ -923,15 +1107,47 @@ export default function Payments() {
 
             {/* Receipt Details */}
             <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
-              {(receiptModal.courseName || receiptModal.groupName) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 'bold' }}>الفوج / المادة:</span>
-                  <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
-                    {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
-                    {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
-                  </span>
+              {receiptModal.items && receiptModal.items.length > 0 ? (
+                <div>
+                  <div style={{
+                    fontWeight: 'bold',
+                    marginBottom: '1mm',
+                    fontSize: '8pt',
+                    borderBottom: '0.5px solid #000000',
+                    paddingBottom: '0.4mm',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}>
+                    <span>{lang === 'ar' ? 'المواد والأفواج المسددة' : 'Matières & Groupes payés'}</span>
+                    <span>{lang === 'ar' ? 'المبلغ' : 'Montant'}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1mm', marginBottom: '1.5mm' }}>
+                    {receiptModal.items.map((it: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
+                          • {it.courseName ? `${it.courseName} ` : ''}{it.groupName ? `(${it.groupName})` : ''}
+                        </span>
+                        <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>
+                          {Number(it.amount).toLocaleString()} DA
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                (receiptModal.courseName || receiptModal.groupName) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 'bold' }}>الفوج / المادة:</span>
+                    <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
+                      {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
+                      {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
+                    </span>
+                  </div>
+                )
               )}
+
+              <div style={{ borderBottom: '1px dashed #000000', margin: '1mm 0' }} />
+
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 'bold' }}>فترة الفوترة:</span>
                 <span style={{ fontWeight: 'bold' }}>{receiptModal.billingPeriod}</span>
@@ -957,7 +1173,7 @@ export default function Payments() {
             {/* Total Amount */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5pt', fontWeight: 'bold', color: '#000000' }}>
               <span>المبلغ الإجمالي:</span>
-              <span>{Number(receiptModal.amount).toLocaleString()} DA</span>
+              <span>{(Number(receiptModal.totalAmount ?? receiptModal.amount) || 0).toLocaleString()} DA</span>
             </div>
 
             <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />

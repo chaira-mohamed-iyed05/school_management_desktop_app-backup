@@ -221,6 +221,20 @@ const api = {
       invoke<any>('payments:studentDebt', { studentId }),
     topUp: (data: { studentId: number; enrollmentId: number; amount: number; paymentMethod: 'cash' | 'transfer' | 'check'; paymentDate: string; reference?: string | null; notes?: string | null }) =>
       invoke<any>('payments:topUp', data),
+    topUpMultiple: (data: {
+      studentId: number
+      items: Array<{
+        enrollmentId?: number
+        newGroupId?: number
+        amount: number
+      }>
+      paymentMethod: 'cash' | 'transfer' | 'check'
+      paymentDate: string
+      reference?: string | null
+      notes?: string | null
+    }) => invoke<any>('payments:topUpMultiple', data),
+    receiptDetails: (paymentId: number) =>
+      invoke<any>('payments:receiptDetails', { paymentId }),
     deductSession: (data: { studentId: number; enrollmentId: number; sessionId: number; sessionDate: string; sessionPrice: number }) =>
       invoke<{ deducted: boolean; newBalance: number; wasInDebt: boolean }>('payments:deductSession', data),
     // transfer always moves 100% of remaining balance — no amount param

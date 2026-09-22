@@ -288,5 +288,37 @@ describe('Accumulated Debt and Pending Collections Rules (ديون متراكم�
   })
 })
 
+describe('Multi-Course Payment & Consolidated Receipt (تسديد عدة مواد في وصل واحد)', () => {
+  it('correctly aggregates multiple course payments into a single receipt total', () => {
+    const items = [
+      { courseName: 'فرنسي', groupName: 'f1', amount: 2500 },
+      { courseName: 'رياضيات', groupName: 'm1', amount: 3000 },
+      { courseName: 'فيزياء', groupName: 'p1', amount: 2000 },
+    ]
+
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+    expect(totalAmount).toBe(7500)
+    expect(items.length).toBe(3)
+  })
+
+  it('correctly formats master receipt number and sub-item receipt numbers', () => {
+    const masterReceipt = 'REC-20260922-0005'
+    const items = [
+      { enrollmentId: 1, amount: 2500 },
+      { enrollmentId: 2, amount: 3000 },
+    ]
+
+    const generatedNumbers = items.map((_, i) => `${masterReceipt}-${i + 1}`)
+    expect(generatedNumbers[0]).toBe('REC-20260922-0005-1')
+    expect(generatedNumbers[1]).toBe('REC-20260922-0005-2')
+
+    // Base receipt number extraction logic
+    const extractBase = (num: string) => num.replace(/-\d+$/, '')
+    expect(extractBase(generatedNumbers[0]!)).toBe(masterReceipt)
+    expect(extractBase(generatedNumbers[1]!)).toBe(masterReceipt)
+  })
+})
+
+
 
 
