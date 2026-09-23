@@ -108,8 +108,12 @@ describe('Session Closing Enrollment and Attendance Rules (غلق الحصة)', 
     )
     expect(student2Enrolled).toBe(false)
 
-    // In open session: both students enrolled on or before session date are considered enrolled
+    // In open session: students are eligible to be marked and deducted regardless of session calendar date
     expect(isEnrolledBeforeSessionClose('2026-09-06', '2026-09-06 10:30:31', sessionDate, 'open', null)).toBe(true)
+    expect(isEnrolledBeforeSessionClose('2026-09-23', '2026-09-23 10:00:00', '2026-09-01', 'open', null)).toBe(true)
+
+    // In closed session: enrolled after closing -> automatically not enrolled ('غير مسجل')
+    expect(isEnrolledBeforeSessionClose('2026-09-23', '2026-09-23 10:00:00', '2026-09-01', 'closed', '2026-09-01 12:00:00')).toBe(false)
   })
 })
 

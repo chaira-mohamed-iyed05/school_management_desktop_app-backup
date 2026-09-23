@@ -143,15 +143,13 @@ export function isEnrolledBeforeSessionClose(
   sessionStatus: string,
   sessionClosedAt?: string | null
 ): boolean {
-  if (enrollmentDate > sessionDate) {
-    return false
-  }
-  if (enrollmentDate < sessionDate) {
+  // In open sessions, active students are always eligible to be marked and have fees deducted
+  if (sessionStatus !== 'closed') {
     return true
   }
 
-  // Same day: if session is closed and we have timestamps, compare precisely
-  if (sessionStatus === 'closed' && sessionClosedAt && enrollmentCreatedAt) {
+  // In closed sessions, verify if student was enrolled before session was closed
+  if (sessionClosedAt && enrollmentCreatedAt) {
     const enrTime = parseUtcTimestamp(enrollmentCreatedAt)
     const closeTime = parseUtcTimestamp(sessionClosedAt)
     if (enrTime > 0 && closeTime > 0) {
@@ -159,8 +157,13 @@ export function isEnrolledBeforeSessionClose(
     }
   }
 
+  if (enrollmentDate > sessionDate) {
+    return false
+  }
+
   return true
 }
+
 
 export async function endAttendanceSession(sessionId: number): Promise<void> {
   const session = requireSession()
@@ -1052,7 +1055,15 @@ export async function markStudentInSession(
     LIMIT 1
   `).get(studentId, session.groupId) as any
 
-  const wasEnrolled = enrollment ? (session.sessionDate >= enrollment.enrollment_date) : false
+  const wasEnrolled = enrollment
+    ? (session.status === 'open' || isEnrolledBeforeSessionClose(
+        enrollment.enrollment_date,
+        enrollment.created_at,
+        session.sessionDate,
+        session.status,
+        session.updatedAt || session.createdAt
+      ))
+    : false
   const sessionPrice = getSessionDeductionPrice(
     session.price,
     enrollment?.agreed_price,

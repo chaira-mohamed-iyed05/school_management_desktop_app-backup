@@ -9,13 +9,40 @@ import log from 'electron-log'
 // ─── Receipt number generator ─────────────────────────────────────────────────
 
 async function generateReceiptNumber(): Promise<string> {
+  const sqlite = getSqlite()
   const db = getDb()
   const settings = await db.query.schoolSettings.findFirst()
   const prefix = settings?.receiptPrefix ?? DEFAULT_RECEIPT_PREFIX
-  const result = await db.select({ count: count() }).from(schema.payments)
-  const total = (result[0]?.count ?? 0) + 1
   const ts = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  return `${prefix}-${ts}-${String(total).padStart(4, '0')}`
+  const pattern = `${prefix}-${ts}-%`
+
+  // Find all receipt numbers generated today for this prefix to locate the highest sequence
+  const rows = sqlite.prepare(`
+    SELECT receipt_number FROM payments
+    WHERE receipt_number LIKE ?
+  `).all(pattern) as { receipt_number: string }[]
+
+  let maxSeq = 0
+  for (const r of rows) {
+    const parts = r.receipt_number.split('-')
+    const lastPart = parts[parts.length - 1]
+    const seq = parseInt(lastPart, 10)
+    if (!isNaN(seq) && seq > maxSeq) {
+      maxSeq = seq
+    }
+  }
+
+  let nextSeq = maxSeq + 1
+  while (true) {
+    const candidate = `${prefix}-${ts}-${String(nextSeq).padStart(4, '0')}`
+    const exists = sqlite.prepare(`
+      SELECT 1 FROM payments WHERE receipt_number = ? LIMIT 1
+    `).get(candidate)
+    if (!exists) {
+      return candidate
+    }
+    nextSeq++
+  }
 }
 
 // ─── Session price = monthlyPrice / 4 ────────────────────────────────────────
