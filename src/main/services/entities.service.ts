@@ -290,9 +290,50 @@ export async function createGroup(data: { courseId: number; teacherId: number; n
 export async function updateGroup(id: number, data: Partial<{ name: string; room: string | null; capacity: number; monthlyPrice: number; status: Group['status']; endDate: string | null }>): Promise<Group> {
   requireSession()
   const db = getDb()
+  const sqlite = getSqlite()
+
   const result = await db.update(schema.groups).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(schema.groups.id, id)).returning()
   if (!result[0]) throw new AppError(ErrorCode.NOT_FOUND, 'Group not found')
   const r = result[0]
+
+  if (data.monthlyPrice !== undefined) {
+    const newMonthly = Number(data.monthlyPrice)
+    const newSessionPrice = Math.round((newMonthly / 4) * 100) / 100
+
+    // 1. Update agreed_price for all active enrollments in this group
+    sqlite.prepare(`
+      UPDATE enrollments
+      SET agreed_price = ?, updated_at = datetime('now')
+      WHERE group_id = ? AND status = 'active'
+    `).run(newMonthly, id)
+
+    // 2. Adjust payments ONLY for currently OPEN sessions (never touch closed sessions)
+    if (newSessionPrice === 0) {
+      // Cancel active session charges for open sessions with default group pricing
+      sqlite.prepare(`
+        UPDATE payments
+        SET status = 'cancelled', updated_at = datetime('now')
+        WHERE session_id IN (
+          SELECT id FROM attendance_sessions
+          WHERE group_id = ? AND status = 'open' AND price IS NULL
+        )
+        AND payment_type IN ('deduction', 'session_charge')
+        AND status = 'paid'
+      `).run(id)
+    } else {
+      // Update amount of active session charges for open sessions with default group pricing
+      sqlite.prepare(`
+        UPDATE payments
+        SET amount = ?, status = 'paid', updated_at = datetime('now')
+        WHERE session_id IN (
+          SELECT id FROM attendance_sessions
+          WHERE group_id = ? AND status = 'open' AND price IS NULL
+        )
+        AND payment_type IN ('deduction', 'session_charge')
+      `).run(newSessionPrice, id)
+    }
+  }
+
   return { id: r.id, courseId: r.courseId, teacherId: r.teacherId, name: r.name, room: r.room ?? null, scheduleJson: r.scheduleJson ?? null, capacity: r.capacity, monthlyPrice: r.monthlyPrice, startDate: r.startDate, endDate: r.endDate ?? null, status: r.status as Group['status'], createdAt: r.createdAt, updatedAt: r.updatedAt }
 }
 

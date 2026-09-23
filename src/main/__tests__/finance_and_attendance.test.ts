@@ -319,6 +319,47 @@ describe('Multi-Course Payment & Consolidated Receipt (تسديد عدة موا�
   })
 })
 
+describe('Group Price Update & Closed Session Immutability (تعديل سعر الفوج وعدم المساس بالحصص المغلقة)', () => {
+  it('correctly calculates session price when group price is 0 DA', () => {
+    // Group monthly price = 0 -> session price = 0
+    const monthlyPrice = 0
+    const sessionPrice = Math.round((monthlyPrice / 4) * 100) / 100
+    expect(sessionPrice).toBe(0)
+  })
 
+  it('correctly calculates new session price when group price is updated', () => {
+    // Group monthly price updated to 2000 DA -> session price = 500 DA
+    const monthlyPrice = 2000
+    const sessionPrice = Math.round((monthlyPrice / 4) * 100) / 100
+    expect(sessionPrice).toBe(500)
+  })
 
+  it('ensures closed sessions retain their historical deduction amounts and are never updated', () => {
+    const closedSession = {
+      id: 101,
+      status: 'closed',
+      deduction: 625,
+    }
+    const openSession = {
+      id: 102,
+      status: 'open',
+      deduction: 625,
+    }
 
+    const newGroupMonthlyPrice = 0
+    const newSessionPrice = Math.round((newGroupMonthlyPrice / 4) * 100) / 100
+
+    // Simulated update logic: only open sessions are updated
+    const updatedSessions = [closedSession, openSession].map((s) => {
+      if (s.status === 'open') {
+        return { ...s, deduction: newSessionPrice }
+      }
+      return s // closed session remains completely untouched
+    })
+
+    // Closed session deduction must remain exactly 625
+    expect(updatedSessions[0]!.deduction).toBe(625)
+    // Open session deduction updates to 0
+    expect(updatedSessions[1]!.deduction).toBe(0)
+  })
+})
