@@ -71,13 +71,13 @@ export async function listStudents(opts: {
   let whereClauses: string[] = []
   let params: any[] = []
 
-  // Status filter
+  // Status filter: Exclude archived/deleted students from normal listings
   if (opts.status === 'archived') {
     whereClauses.push("s.status = 'archived'")
   } else if (opts.status === 'active' || opts.status === 'inactive') {
     whereClauses.push(`s.status = '${opts.status}'`)
-  } else if (opts.status !== 'all' && opts.status !== 'paid' && opts.status !== 'in_debt') {
-    whereClauses.push("s.status != 'archived'")
+  } else {
+    whereClauses.push("s.status NOT IN ('archived', 'deleted')")
   }
 
   // Hierarchy filters: courseId, teacherId, groupId
@@ -278,16 +278,47 @@ export async function updateStudent(
   return mapRow(result[0]!)
 }
 
-// ─── Archive student ──────────────────────────────────────────────────────────
+// ─── Delete student (Permanent soft delete with balance refund & capacity clearing) ───────
 
-export async function archiveStudent(id: number): Promise<void> {
+export async function deleteStudent(id: number): Promise<{ success: boolean; totalRefunded: number }> {
   const session = requireSession()
   const db = getDb()
+  const sqlite = getSqlite()
 
   const existing = await db.query.students.findFirst({ where: eq(schema.students.id, id) })
   if (!existing) throw new AppError(ErrorCode.STUDENT_NOT_FOUND, `Student ${id} not found`)
 
+  const { getStudentBalance, refundEnrollment } = await import('./payment.service')
+  const balanceInfo = await getStudentBalance(id)
+
+  let totalRefunded = 0
+
+  // 1. If student has positive balance across any enrollment, generate a refund payment row
+  for (const enr of balanceInfo.enrollmentBalances) {
+    if (enr.balance > 0) {
+      try {
+        const res = await refundEnrollment({
+          enrollmentId: enr.enrollmentId,
+          studentId: id,
+          notes: `استرجاع رصيد متبقٍ عند حذف الطالب (${existing.studentNumber})`,
+        })
+        totalRefunded += res.refunded
+      } catch (err) {
+        log.warn(`Refund failed during student ${id} deletion:`, err)
+      }
+    }
+  }
+
   const now = new Date().toISOString()
+
+  // 2. Cancel all active enrollments to immediately clear group capacity
+  sqlite.prepare(`
+    UPDATE enrollments
+    SET status = 'cancelled', cancelled_at = ?, cancel_reason = 'student_deleted', updated_at = ?
+    WHERE student_id = ? AND status = 'active'
+  `).run(now, now, id)
+
+  // 3. Mark student as archived/deleted and deactivate QR
   await db.update(schema.students).set({
     status: 'archived',
     qrTokenActive: false,
@@ -298,11 +329,21 @@ export async function archiveStudent(id: number): Promise<void> {
   // Audit
   await db.insert(schema.auditLogs).values({
     administratorId: session.adminId,
-    action: 'student.archive',
+    action: 'student.delete',
     entityType: 'student',
     entityId: id,
-    sanitizedDetailsJson: JSON.stringify({ studentNumber: existing.studentNumber }),
+    sanitizedDetailsJson: JSON.stringify({
+      studentNumber: existing.studentNumber,
+      totalRefunded,
+      previousBalance: balanceInfo.totalBalance,
+    }),
   })
+
+  return { success: true, totalRefunded }
+}
+
+export async function archiveStudent(id: number): Promise<void> {
+  await deleteStudent(id)
 }
 
 // ─── Regenerate QR token ──────────────────────────────────────────────────────

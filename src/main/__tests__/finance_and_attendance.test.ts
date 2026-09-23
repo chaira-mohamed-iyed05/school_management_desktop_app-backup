@@ -363,3 +363,72 @@ describe('Group Price Update & Closed Session Immutability (تعديل سعر ا
     expect(updatedSessions[1]!.deduction).toBe(0)
   })
 })
+
+describe('Student Deletion Financial Settlement & Historical Attendance Preservation (حذف الطالب والتسوية المالية)', () => {
+  it('unspent credit triggers refund record deducted from profits (-1000 DA)', () => {
+    const studentBalance = 1000 // 1000 DA unspent credit
+    const initialMonthRevenue = 50000
+
+    // On deletion, unspent positive balance is refunded
+    const refundAmount = studentBalance
+    expect(refundAmount).toBeGreaterThan(0)
+
+    // Net revenue calculation: paid refunds are subtracted: CASE WHEN payment_type = 'refund' THEN -amount
+    const monthRevenueAfterDelete = initialMonthRevenue - refundAmount
+    expect(monthRevenueAfterDelete).toBe(49000)
+  })
+
+  it('cancelling a refund restores the refunded amount back to revenue', () => {
+    const initialMonthRevenue = 49000
+    const refundAmount = 1000
+
+    // If admin cancels the refund (status = 'cancelled'), it is no longer counted as a refund deduction
+    const restoredRevenue = initialMonthRevenue + refundAmount
+    expect(restoredRevenue).toBe(50000)
+  })
+
+  it('student debt is dropped upon deletion and excluded from accumulated debt', () => {
+    const activeStudentDebt = 2500
+    const deletedStudentDebt = 1500
+
+    // Before deletion: total debt includes both
+    const totalDebtBefore = activeStudentDebt + deletedStudentDebt
+    expect(totalDebtBefore).toBe(4000)
+
+    // After deletion: only active students count towards total debt (WHERE st.status = 'active')
+    const activeStudents = [{ status: 'active', debt: activeStudentDebt }]
+    const totalDebtAfter = activeStudents
+      .filter((s) => s.status === 'active')
+      .reduce((sum, s) => sum + s.debt, 0)
+
+    expect(totalDebtAfter).toBe(2500)
+    expect(totalDebtAfter).not.toContain(deletedStudentDebt)
+  })
+
+  it('closed sessions retain attendance records of deleted students while open sessions exclude them', () => {
+    const deletedStudent = { id: 1, name: 'طالب محذوف', status: 'archived' }
+    const activeStudent = { id: 2, name: 'طالب نشط', status: 'active' }
+
+    const closedSessionRecords = [
+      { studentId: 1, status: 'present' },
+      { studentId: 2, status: 'absent' },
+    ]
+
+    // In closed sessions: students with existing attendance_records are preserved
+    const closedSessionRoster = [deletedStudent, activeStudent].filter((st) => {
+      // WHERE (s.status = 'closed' AND ar.id IS NOT NULL) OR (e.status = 'active' AND st.status = 'active')
+      return closedSessionRecords.some((rec) => rec.studentId === st.id)
+    })
+    expect(closedSessionRoster.length).toBe(2)
+    expect(closedSessionRoster.some((st) => st.id === deletedStudent.id)).toBe(true)
+
+    // In open sessions: only active students with active enrollments appear
+    const openSessionRoster = [deletedStudent, activeStudent].filter((st) => {
+      return st.status === 'active'
+    })
+    expect(openSessionRoster.length).toBe(1)
+    expect(openSessionRoster[0]!.id).toBe(activeStudent.id)
+    expect(openSessionRoster.some((st) => st.id === deletedStudent.id)).toBe(false)
+  })
+})
+

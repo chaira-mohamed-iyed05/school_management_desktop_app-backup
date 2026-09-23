@@ -371,14 +371,6 @@ export default function Students() {
             <AlertCircle size={13} />
             {t('students.inDebt')}
           </button>
-          <button
-            onClick={() => { setStatusFilter('archived'); setPage(1); }}
-            className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-colors whitespace-nowrap ${
-              statusFilter === 'archived' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
-            }`}
-          >
-            {t('students.archived')}
-          </button>
         </div>
 
         <button

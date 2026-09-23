@@ -489,30 +489,26 @@ export default function StudentProfile() {
     if (res.success) await load()
   }
 
-  const handleArchive = async () => {
-    if (!student) return
-    const ok = await confirm({
-      title: t('students.archive'),
-      message: t('students.archiveConfirm'),
-      variant: 'danger',
-      confirmText: t('students.archive'),
-    })
-    if (!ok) return
-    await window.schoolApp.students.archive(student.id)
-    navigate('/students')
-  }
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingStudent, setDeletingStudent] = useState(false)
 
-  const handleRestore = async () => {
+
+  const handleDeleteStudent = async () => {
     if (!student) return
-    const ok = await confirm({
-      title: t('students.restore'),
-      message: t('students.restoreConfirm') || 'Restaurer cet étudiant ?',
-      variant: 'info',
-    })
-    if (!ok) return
-    await window.schoolApp.students.update(student.id, { status: 'active' } as any)
-    await window.schoolApp.students.regenQR(student.id)
-    await load()
+    setDeletingStudent(true)
+    try {
+      const res = await window.schoolApp.students.delete(student.id)
+      if (res?.success) {
+        setShowDeleteModal(false)
+        navigate('/students')
+      } else {
+        alert(res?.error || (lang === 'ar' ? 'فشل حذف الطالب' : 'Failed to delete student'))
+      }
+    } catch (err: any) {
+      alert(err?.message || (lang === 'ar' ? 'فشل حذف الطالب' : 'Failed to delete student'))
+    } finally {
+      setDeletingStudent(false)
+    }
   }
 
   const handleChangePhoto = async () => {
@@ -919,35 +915,25 @@ export default function StudentProfile() {
             </div>
           )}
 
-          {/* Archive / Restore Box */}
-          {student.status === 'archived' ? (
-            <div className="bg-white rounded-xl border border-emerald-200 p-4 bg-emerald-50/40 shadow-xs">
-              <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-                <CheckCircle2 size={13} /> {t('students.restoreStudent')}
-              </h3>
-              <p className="text-xs text-slate-600 mb-3">
-                {t('students.archivedNotice')}
-              </p>
-              <button
-                onClick={handleRestore}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs"
-              >
-                <RefreshCw size={13} /> {t('students.restoreAndActivate')}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-red-100 p-4 shadow-xs">
-              <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                <AlertCircle size={12} /> {t('students.archiveDangerZone')}
-              </h3>
-              <button
-                onClick={handleArchive}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-50 transition-colors"
-              >
-                <Archive size={13} /> {t('students.archive')}
-              </button>
-            </div>
-          )}
+          {/* Delete Student Box */}
+          <div className="bg-white rounded-xl border border-red-200 p-4 shadow-2xs">
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <AlertCircle size={13} /> {lang === 'ar' ? 'حذف الطالب' : lang === 'en' ? 'Delete Student' : 'Supprimer l\'étudiant'}
+            </h3>
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              {lang === 'ar'
+                ? 'حذف الطالب نهائياً من القوائم النشطة وإخلاء مكانه في الأفواج مع تسوية رصيده والاحتفاظ بسجلات حضوره السابقة.'
+                : lang === 'en'
+                ? 'Permanently delete student, clear group capacity, adjust balance, and preserve past attendance history.'
+                : 'Supprimer définitivement l\'étudiant, libérer la capacité, ajuster le solde et préserver l\'historique.'}
+            </p>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-300 hover:border-red-600 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            >
+              <Trash2 size={13} /> {lang === 'ar' ? 'حذف الطالب نهائياً' : lang === 'en' ? 'Delete Student' : 'Supprimer l\'étudiant'}
+            </button>
+          </div>
         </div>
 
         {/* ── RIGHT (2 cols): Tabbed content ── */}
@@ -1573,6 +1559,102 @@ export default function StudentProfile() {
               >
                 <ArrowRightLeft size={13} />
                 {savingTransfer ? t('common.saving') : t('students.confirmTransfer')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Delete Student Confirmation ── */}
+      {showDeleteModal && student && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => !deletingStudent && setShowDeleteModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  {lang === 'ar' ? 'تأكيد حذف الطالب' : lang === 'en' ? 'Confirm Student Deletion' : 'Confirmer la suppression'}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono">
+                  {student.lastNameAr} {student.firstNameAr} (#{student.studentNumber})
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Financial Balance Status */}
+              {totalCredit > 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1">
+                  <p className="font-bold text-xs flex items-center gap-1.5 text-amber-800">
+                    <CreditCard size={14} />
+                    <span>{lang === 'ar' ? `رصيد متبقٍ غير مستهلك: +${totalCredit.toLocaleString()} د.ج` : `Unspent credit: +${totalCredit.toLocaleString()} DA`}</span>
+                  </p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    {lang === 'ar'
+                      ? `سيتم تلقائياً إنشاء وصل استرجاع بقيمة -${totalCredit.toLocaleString()} د.ج في صفحة المدفوعات وخصمه من أرباح ومداخيل المدرسة. (يمكنك إلغاء هذا الوصل من صفحة المدفوعات إذا أردت إعادة احتساب المبلغ).`
+                      : `A refund record of -${totalCredit.toLocaleString()} DA will be automatically created in Payments and deducted from profits.`}
+                  </p>
+                </div>
+              ) : totalDebt > 0 ? (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-900 space-y-1">
+                  <p className="font-bold text-xs flex items-center gap-1.5 text-red-700">
+                    <AlertTriangle size={14} />
+                    <span>{lang === 'ar' ? `ديون متراكمة على الطالب: ${totalDebt.toLocaleString()} د.ج` : `Accumulated debt: ${totalDebt.toLocaleString()} DA`}</span>
+                  </p>
+                  <p className="text-[11px] text-red-600 leading-relaxed">
+                    {lang === 'ar'
+                      ? 'سيتم إسقاط هذه الديون تلقائياً وإلغاؤها من حسابات ديون المدرسة ولن تعود تُحتسب في الديون المتراكمة.'
+                      : 'These debts will be dropped and will no longer count towards accumulated debt.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px]">
+                  <span>{lang === 'ar' ? 'رصيد الطالب خالص (0 د.ج).' : 'Student balance is settled (0 DA).'}</span>
+                </div>
+              )}
+
+              {/* Consequence list */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-slate-700 text-[11px]">
+                <p className="font-bold text-slate-900">{lang === 'ar' ? 'ماذا سيحدث بعد الحذف؟' : 'What happens next?'}</p>
+                <ul className="space-y-1.5 list-disc list-inside text-slate-600">
+                  <li>
+                    {lang === 'ar'
+                      ? `إلغاء اشتراكات الطالب في الأفواج (${enrollments.length} فوج) وإخلاء مكانه لزيادة المقاعد الشاغرة فوراً.`
+                      : `Cancel enrollments and immediately free up capacity in ${enrollments.length} group(s).`}
+                  </li>
+                  <li>
+                    {lang === 'ar'
+                      ? 'إخفاء الطالب نهائياً من القوائم النشطة ومن الحصص القادمة والمفتوحة.'
+                      : 'Remove student from active lists and upcoming/open sessions.'}
+                  </li>
+                  <li>
+                    {lang === 'ar'
+                      ? 'الحفاظ الكامل على سجلات حضوره في الحصص المغلقة السابقة وتقارير حصص الأفواج كطالب (محذوف).'
+                      : 'Preserve all past attendance records in closed sessions and group session reports as (Deleted).'}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deletingStudent}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteStudent}
+                disabled={deletingStudent}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Trash2 size={13} />
+                <span>{deletingStudent ? t('common.saving') : (lang === 'ar' ? 'تأكيد الحذف' : 'Confirmer la suppression')}</span>
               </button>
             </div>
           </div>

@@ -1245,18 +1245,36 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
   `).get(sessionId) as any
   if (!session) throw new Error('Session not found')
 
-  const enrolled = sqlite.prepare(`
-    SELECT st.id, st.student_number, st.first_name_ar, st.last_name_ar, st.first_name_fr, st.last_name_fr,
-           st.status as student_status, e.id as enrollment_id, e.agreed_price, g.monthly_price,
-           e.enrollment_date, e.created_at as enrollment_created_at,
-           ar.attendance_status, ar.is_inactive, ar.source, ar.scanned_at, ar.id as record_id
-    FROM enrollments e
-    JOIN students st ON e.student_id = st.id
-    JOIN groups g ON e.group_id = g.id
-    LEFT JOIN attendance_records ar ON ar.session_id = ? AND ar.student_id = st.id
-    WHERE e.group_id = ? AND e.status = 'active'
-    ORDER BY st.last_name_ar, st.first_name_ar
-  `).all(sessionId, session.group_id) as any[]
+  const enrolledQuery = session.status === 'closed'
+    ? `
+      SELECT st.id, st.student_number, st.first_name_ar, st.last_name_ar, st.first_name_fr, st.last_name_fr,
+             st.status as student_status, e.id as enrollment_id, e.agreed_price, g.monthly_price,
+             e.enrollment_date, e.created_at as enrollment_created_at,
+             ar.attendance_status, ar.is_inactive, ar.source, ar.scanned_at, ar.id as record_id
+      FROM enrollments e
+      JOIN students st ON e.student_id = st.id
+      JOIN groups g ON e.group_id = g.id
+      LEFT JOIN attendance_records ar ON ar.session_id = ? AND ar.student_id = st.id
+      WHERE e.group_id = ? AND (
+        (e.status = 'active' AND st.status = 'active')
+        OR ar.id IS NOT NULL
+      )
+      ORDER BY st.last_name_ar, st.first_name_ar
+    `
+    : `
+      SELECT st.id, st.student_number, st.first_name_ar, st.last_name_ar, st.first_name_fr, st.last_name_fr,
+             st.status as student_status, e.id as enrollment_id, e.agreed_price, g.monthly_price,
+             e.enrollment_date, e.created_at as enrollment_created_at,
+             ar.attendance_status, ar.is_inactive, ar.source, ar.scanned_at, ar.id as record_id
+      FROM enrollments e
+      JOIN students st ON e.student_id = st.id
+      JOIN groups g ON e.group_id = g.id
+      LEFT JOIN attendance_records ar ON ar.session_id = ? AND ar.student_id = st.id
+      WHERE e.group_id = ? AND e.status = 'active' AND st.status = 'active'
+      ORDER BY st.last_name_ar, st.first_name_ar
+    `
+
+  const enrolled = sqlite.prepare(enrolledQuery).all(sessionId, session.group_id) as any[]
 
   // For closed sessions (that are not cancelled), auto-heal any missing absent records for students enrolled before closing
   if (session.status === 'closed' && session.session_type !== 'cancelled') {
@@ -1649,7 +1667,7 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
     SELECT st.id as student_id, st.student_number, st.first_name_ar, st.last_name_ar,
            st.first_name_fr, st.last_name_fr, st.phone, st.status as student_status,
            e.id as enrollment_id, e.agreed_price, e.enrollment_date, e.created_at as enrollment_created_at,
-           e.status as enrollment_status
+           e.status as enrollment_status, e.cancelled_at
     FROM enrollments e
     JOIN students st ON e.student_id = st.id
     WHERE e.group_id = ?
@@ -1728,6 +1746,7 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
       )
 
       let status: 'present' | 'absent' | 'not_active' | 'not_enrolled_yet' | 'cancelled'
+      const wasCancelledBeforeSession = st.cancelled_at && sess.sessionDate > st.cancelled_at.slice(0, 10)
 
       if (sess.sessionType === 'cancelled') {
         status = 'cancelled'
@@ -1739,8 +1758,10 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
         } else if (rec.attendance_status === 'absent') {
           status = 'absent'
         } else {
-          status = wasEnrolledBefore ? 'absent' : 'not_enrolled_yet'
+          status = wasEnrolledBefore && !wasCancelledBeforeSession ? 'absent' : 'not_enrolled_yet'
         }
+      } else if (wasCancelledBeforeSession) {
+        status = 'not_enrolled_yet'
       } else {
         if (wasEnrolledBefore) {
           status = 'absent'

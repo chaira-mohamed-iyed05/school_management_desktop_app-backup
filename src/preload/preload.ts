@@ -67,8 +67,10 @@ const api = {
       gender: 'male' | 'female'; dateOfBirth: string | null; phone: string | null
       guardianName: string | null; status: string; photoPath: string | null
     }>) => invoke<Student>(IPC_CHANNELS.STUDENTS_UPDATE, { id, ...data }),
+    delete: (id: number) =>
+      invoke<{ success: boolean; totalRefunded: number }>('students:delete', { id }),
     archive: (id: number) =>
-      invoke<boolean>(IPC_CHANNELS.STUDENTS_ARCHIVE, { id }),
+      invoke<{ success: boolean; totalRefunded: number }>('students:delete', { id }),
     regenQR: (id: number) =>
       invoke<{ token: string }>(IPC_CHANNELS.STUDENTS_REGEN_QR, { id }),
     getPhotoUrl: (filename: string, entityType: 'student' | 'teacher') =>

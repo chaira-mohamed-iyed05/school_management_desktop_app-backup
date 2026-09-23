@@ -6,7 +6,7 @@ import {
 } from '../../shared/schemas/index'
 import {
   listStudents, getStudentById, createStudent,
-  updateStudent, archiveStudent, regenerateQRToken
+  updateStudent, archiveStudent, deleteStudent, regenerateQRToken
 } from '../services/student.service'
 import { getPhotoAsDataUrl } from '../services/media.service'
 import { getSqlite } from '../database/connection'
@@ -37,8 +37,12 @@ export function registerStudentHandlers(): void {
 
   handle(IPC_CHANNELS.STUDENTS_ARCHIVE, async (payload) => {
     const { id } = StudentIdSchema.parse(payload)
-    await archiveStudent(id)
-    return true
+    return deleteStudent(id)
+  })
+
+  handle('students:delete', async (payload) => {
+    const { id } = StudentIdSchema.parse(payload)
+    return deleteStudent(id)
   })
 
   handle(IPC_CHANNELS.STUDENTS_REGEN_QR, async (payload) => {

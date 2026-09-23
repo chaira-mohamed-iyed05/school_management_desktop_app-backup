@@ -692,7 +692,9 @@ export default function Payments() {
                        (lang === 'ar' ? 'استرداد' : lang === 'en' ? 'Refund' : 'Remboursement')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-bold text-[#2563EB]">{p.amount?.toLocaleString()} DA</td>
+                  <td className={`px-4 py-3 font-bold ${p.paymentType === 'refund' ? 'text-red-600' : 'text-[#2563EB]'}`}>
+                    {p.paymentType === 'refund' ? `-${p.amount?.toLocaleString()} DA` : `${p.amount?.toLocaleString()} DA`}
+                  </td>
                   <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">{p.paymentDate}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -720,7 +722,7 @@ export default function Payments() {
                     >
                       <Printer size={12} />
                     </button>
-                    {p.status === 'paid' && p.paymentType === 'credit' && (
+                    {p.status === 'paid' && (p.paymentType === 'credit' || p.paymentType === 'refund') && (
                       <button onClick={() => handleCancel(p.id)} className="text-xs text-red-500 hover:underline">{t('payments.cancel')}</button>
                     )}
                   </td>

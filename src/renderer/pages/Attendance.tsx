@@ -719,6 +719,11 @@ function RosterView({ lang, initialSession }: { lang: string; initialSession?: {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-[#0F172A] truncate" dir="rtl">{s.lastNameAr} {s.firstNameAr}</p>
+                      {(s.status === 'archived' || s.status === 'deleted') && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                          {lang === 'ar' ? 'محذوف' : 'Supprimé'}
+                        </span>
+                      )}
                       {s.wasInDebt ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 border border-red-200 shrink-0">
                           ⚠️ {lang === 'ar' ? `رصيد سالب: ${s.creditBalance} د.ج` : lang === 'en' ? `Negative: ${s.creditBalance} DA` : `Solde: ${s.creditBalance} DA`}

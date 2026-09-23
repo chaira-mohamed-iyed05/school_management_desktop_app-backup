@@ -601,7 +601,14 @@ export default function Reports() {
                   {groupReportData.students.map((st: any, i: number) => (
                     <tr key={st.studentId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                       <td className="p-2 border-e border-slate-200">
-                        <div className="font-bold">{st.lastNameAr} {st.firstNameAr}</div>
+                        <div className="font-bold flex items-center gap-1.5">
+                          <span>{st.lastNameAr} {st.firstNameAr}</span>
+                          {(st.studentStatus === 'archived' || st.studentStatus === 'deleted') && (
+                            <span className="px-1.5 py-0.2 text-[9px] rounded font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              محذوف
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[9px] text-slate-500 font-mono">#{st.studentNumber}</div>
                         <div className="text-[8.5px] font-bold text-slate-700 mt-0.5">
                           {st.currentBalance > 0 ? `+${st.currentBalance.toLocaleString()} دج` : `${st.currentBalance.toLocaleString()} دج`}
@@ -1184,8 +1191,13 @@ export default function Reports() {
                                 <tr key={st.studentId} className={idx % 2 === 0 ? 'bg-white hover:bg-slate-50/60' : 'bg-slate-50/30 hover:bg-slate-50/60'}>
                                   {/* Sticky Student Info Cell */}
                                   <td className="p-3 sticky right-0 bg-inherit z-10 border-l border-border shadow-xs">
-                                    <div className="font-bold text-slate-900" dir="rtl">
-                                      {st.lastNameAr} {st.firstNameAr}
+                                    <div className="font-bold text-slate-900 flex items-center gap-1.5" dir="rtl">
+                                      <span>{st.lastNameAr} {st.firstNameAr}</span>
+                                      {(st.studentStatus === 'archived' || st.studentStatus === 'deleted') && (
+                                        <span className="px-1.5 py-0.2 text-[9px] rounded font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                          محذوف
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="text-[11px] text-slate-500 font-sans">
                                       {st.lastNameFr} {st.firstNameFr}
