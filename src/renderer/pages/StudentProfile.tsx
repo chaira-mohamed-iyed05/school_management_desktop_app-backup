@@ -1593,19 +1593,19 @@ export default function StudentProfile() {
                   </p>
                   <p className="text-[11px] text-amber-700 leading-relaxed">
                     {lang === 'ar'
-                      ? `سيتم تلقائياً إنشاء وصل استرجاع بقيمة -${totalCredit.toLocaleString()} د.ج في صفحة المدفوعات وخصمه من أرباح ومداخيل المدرسة. (يمكنك إلغاء هذا الوصل من صفحة المدفوعات إذا أردت إعادة احتساب المبلغ).`
-                      : `A refund record of -${totalCredit.toLocaleString()} DA will be automatically created in Payments and deducted from profits.`}
+                      ? 'سيتم حذف الطالب مع بقاء مداخيل وأرباح المدرسة كما هي دون أي خصم أو تأثير مالي.'
+                      : 'The student will be deleted without any reduction or effect on school revenues.'}
                   </p>
                 </div>
               ) : totalDebt > 0 ? (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-900 space-y-1">
                   <p className="font-bold text-xs flex items-center gap-1.5 text-red-700">
                     <AlertTriangle size={14} />
-                    <span>{lang === 'ar' ? `ديون متراكمة على الطالب: ${totalDebt.toLocaleString()} د.ج` : `Accumulated debt: ${totalDebt.toLocaleString()} DA`}</span>
+                    <span>{lang === 'ar' ? `ديون على الطالب: ${totalDebt.toLocaleString()} د.ج` : `Student debt: ${totalDebt.toLocaleString()} DA`}</span>
                   </p>
                   <p className="text-[11px] text-red-600 leading-relaxed">
                     {lang === 'ar'
-                      ? 'سيتم إسقاط هذه الديون تلقائياً وإلغاؤها من حسابات ديون المدرسة ولن تعود تُحتسب في الديون المتراكمة.'
+                      ? 'سيتم إسقاط هذه الديون تلقائياً ولن تعود تُحتسب في الديون المتراكمة على المدرسة.'
                       : 'These debts will be dropped and will no longer count towards accumulated debt.'}
                   </p>
                 </div>

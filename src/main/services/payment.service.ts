@@ -1137,25 +1137,15 @@ export async function getPaymentsSummary(): Promise<{
   const monthStart = today.slice(0, 7) + '-01'
 
   const monthCredit = (sqlite.prepare(`
-    SELECT COALESCE(SUM(
-      CASE 
-        WHEN payment_type IN ('credit', 'payment', 'top_up') THEN amount
-        WHEN payment_type IN ('refund', 'session_refund') THEN -amount
-        ELSE 0
-      END
-    ), 0) as total FROM payments
-    WHERE status='paid' AND payment_date >= ?
+    SELECT COALESCE(SUM(amount), 0) as total FROM payments
+    WHERE payment_type IN ('credit', 'payment', 'top_up')
+      AND status='paid' AND payment_date >= ?
   `).get(monthStart) as any)?.total ?? 0
 
   const todayCredit = (sqlite.prepare(`
-    SELECT COALESCE(SUM(
-      CASE 
-        WHEN payment_type IN ('credit', 'payment', 'top_up') THEN amount
-        WHEN payment_type IN ('refund', 'session_refund') THEN -amount
-        ELSE 0
-      END
-    ), 0) as total FROM payments
-    WHERE status='paid' AND payment_date = ?
+    SELECT COALESCE(SUM(amount), 0) as total FROM payments
+    WHERE payment_type IN ('credit', 'payment', 'top_up')
+      AND status='paid' AND payment_date = ?
   `).get(today) as any)?.total ?? 0
 
   // 1. ديون متراكمة (Total current debts):

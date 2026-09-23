@@ -278,9 +278,9 @@ export async function updateStudent(
   return mapRow(result[0]!)
 }
 
-// ─── Delete student (Permanent soft delete with balance refund & capacity clearing) ───────
+// ─── Delete student (Permanent soft delete & group capacity clearing) ─────────
 
-export async function deleteStudent(id: number): Promise<{ success: boolean; totalRefunded: number }> {
+export async function deleteStudent(id: number): Promise<{ success: boolean }> {
   const session = requireSession()
   const db = getDb()
   const sqlite = getSqlite()
@@ -288,58 +288,33 @@ export async function deleteStudent(id: number): Promise<{ success: boolean; tot
   const existing = await db.query.students.findFirst({ where: eq(schema.students.id, id) })
   if (!existing) throw new AppError(ErrorCode.STUDENT_NOT_FOUND, `Student ${id} not found`)
 
-  const { getStudentBalance, refundEnrollment } = await import('./payment.service')
-  const balanceInfo = await getStudentBalance(id)
-
-  let totalRefunded = 0
-
-  // 1. If student has positive balance across any enrollment, generate a refund payment row
-  for (const enr of balanceInfo.enrollmentBalances) {
-    if (enr.balance > 0) {
-      try {
-        const res = await refundEnrollment({
-          enrollmentId: enr.enrollmentId,
-          studentId: id,
-          notes: `استرجاع رصيد متبقٍ عند حذف الطالب (${existing.studentNumber})`,
-        })
-        totalRefunded += res.refunded
-      } catch (err) {
-        log.warn(`Refund failed during student ${id} deletion:`, err)
-      }
-    }
-  }
-
   const now = new Date().toISOString()
 
-  // 2. Cancel all active enrollments to immediately clear group capacity
-  sqlite.prepare(`
-    UPDATE enrollments
-    SET status = 'cancelled', cancelled_at = ?, cancel_reason = 'student_deleted', updated_at = ?
-    WHERE student_id = ? AND status = 'active'
-  `).run(now, now, id)
+  // Run in an atomic SQLite transaction
+  sqlite.transaction(() => {
+    // 1. Cancel all enrollments (active & inactive) to free capacity
+    // Use status = 'completed' with cancelled_at to conform to CHECK(status IN ('active', 'inactive', 'completed'))
+    sqlite.prepare(`
+      UPDATE enrollments
+      SET status = 'completed', cancelled_at = ?, cancel_reason = 'student_deleted', updated_at = ?
+      WHERE student_id = ? AND status IN ('active', 'inactive')
+    `).run(now, now, id)
 
-  // 3. Mark student as archived/deleted and deactivate QR
-  await db.update(schema.students).set({
-    status: 'archived',
-    qrTokenActive: false,
-    archivedAt: now,
-    updatedAt: now,
-  }).where(eq(schema.students.id, id))
+    // 2. Mark student as archived/deleted and deactivate QR token
+    sqlite.prepare(`
+      UPDATE students
+      SET status = 'archived', qr_token_active = 0, archived_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(now, now, id)
 
-  // Audit
-  await db.insert(schema.auditLogs).values({
-    administratorId: session.adminId,
-    action: 'student.delete',
-    entityType: 'student',
-    entityId: id,
-    sanitizedDetailsJson: JSON.stringify({
-      studentNumber: existing.studentNumber,
-      totalRefunded,
-      previousBalance: balanceInfo.totalBalance,
-    }),
-  })
+    // 3. Audit log
+    sqlite.prepare(`
+      INSERT INTO audit_logs (administrator_id, action, entity_type, entity_id, sanitized_details_json, created_at)
+      VALUES (?, 'student.delete', 'student', ?, ?, ?)
+    `).run(session.adminId, id, JSON.stringify({ studentNumber: existing.studentNumber }), now)
+  })()
 
-  return { success: true, totalRefunded }
+  return { success: true }
 }
 
 export async function archiveStudent(id: number): Promise<void> {

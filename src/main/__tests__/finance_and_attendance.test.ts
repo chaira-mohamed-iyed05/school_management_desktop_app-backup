@@ -365,26 +365,14 @@ describe('Group Price Update & Closed Session Immutability (تعديل سعر ا
 })
 
 describe('Student Deletion Financial Settlement & Historical Attendance Preservation (حذف الطالب والتسوية المالية)', () => {
-  it('unspent credit triggers refund record deducted from profits (-1000 DA)', () => {
+  it('deleting a student leaves school revenues completely untouched without deduction', () => {
     const studentBalance = 1000 // 1000 DA unspent credit
     const initialMonthRevenue = 50000
 
-    // On deletion, unspent positive balance is refunded
-    const refundAmount = studentBalance
-    expect(refundAmount).toBeGreaterThan(0)
-
-    // Net revenue calculation: paid refunds are subtracted: CASE WHEN payment_type = 'refund' THEN -amount
-    const monthRevenueAfterDelete = initialMonthRevenue - refundAmount
-    expect(monthRevenueAfterDelete).toBe(49000)
-  })
-
-  it('cancelling a refund restores the refunded amount back to revenue', () => {
-    const initialMonthRevenue = 49000
-    const refundAmount = 1000
-
-    // If admin cancels the refund (status = 'cancelled'), it is no longer counted as a refund deduction
-    const restoredRevenue = initialMonthRevenue + refundAmount
-    expect(restoredRevenue).toBe(50000)
+    // On deletion, no refund record is generated and revenue is untouched
+    const monthRevenueAfterDelete = initialMonthRevenue
+    expect(monthRevenueAfterDelete).toBe(50000)
+    expect(studentBalance).toBe(1000)
   })
 
   it('student debt is dropped upon deletion and excluded from accumulated debt', () => {
@@ -430,5 +418,15 @@ describe('Student Deletion Financial Settlement & Historical Attendance Preserva
     expect(openSessionRoster[0]!.id).toBe(activeStudent.id)
     expect(openSessionRoster.some((st) => st.id === deletedStudent.id)).toBe(false)
   })
+
+  it('ensures enrollment cancellation respects valid schema enum values', () => {
+    const validStatuses = ['active', 'inactive', 'completed']
+    const cancelStatus = 'completed' // Not 'cancelled', which is rejected by SQLite CHECK constraint
+
+    expect(validStatuses).toContain(cancelStatus)
+    expect(validStatuses).not.toContain('cancelled')
+  })
 })
+
+
 
