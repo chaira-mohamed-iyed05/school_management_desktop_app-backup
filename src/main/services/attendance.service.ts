@@ -906,8 +906,11 @@ export async function resolveStudentSessions(rawToken: string, date: string): Pr
       const jsDay = new Date(date + 'T00:00:00Z').getUTCDay()
       const weekday = jsDay === 0 ? 6 : jsDay - 1
       const slots = sqlite.prepare(`
-        SELECT * FROM group_schedule_slots WHERE group_id = ? AND weekday = ? AND is_active = 1
-      `).all(groupId, weekday) as any[]
+        SELECT s.* FROM group_schedule_slots s
+        JOIN groups g ON s.group_id = g.id
+        WHERE s.group_id = ? AND s.weekday = ? AND s.is_active = 1
+          AND g.start_date <= ? AND (g.end_date IS NULL OR g.end_date >= ?)
+      `).all(groupId, weekday, date, date) as any[]
 
       for (const slot of slots) {
         sqlite.prepare(`
@@ -1433,13 +1436,15 @@ export async function autoInstantiateSessionsForRange(startDate: string, endDate
     const jsDay = d.getUTCDay()
     const weekday = jsDay === 0 ? 6 : jsDay - 1 // Mon=0 .. Sun=6
 
-    // Find active schedule slots on this weekday
+    // Find active schedule slots on this weekday respecting group start_date and end_date
     const slots = sqlite.prepare(`
       SELECT s.*, g.monthly_price
       FROM group_schedule_slots s
       JOIN groups g ON s.group_id = g.id
       WHERE s.weekday = ? AND s.is_active = 1 AND g.status = 'active'
-    `).all(weekday) as any[]
+        AND g.start_date <= ?
+        AND (g.end_date IS NULL OR g.end_date >= ?)
+    `).all(weekday, dateStr, dateStr) as any[]
 
     for (const slot of slots) {
       // Check if session already exists or cancelled

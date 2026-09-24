@@ -204,6 +204,8 @@ const api = {
       invoke<{ generated: number; message: string }>('sessions:generateForGroup', { groupId }),
     trimAfterDate: (groupId: number, afterDate: string) =>
       invoke<{ removed: number }>('sessions:trimAfterDate', { groupId, afterDate }),
+    trimBeforeDate: (groupId: number, beforeDate: string) =>
+      invoke<{ removed: number }>('sessions:trimBeforeDate', { groupId, beforeDate }),
   },
 
   payments: {

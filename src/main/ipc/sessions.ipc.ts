@@ -70,10 +70,13 @@ export function registerSessionsHandlers(): void {
       const group = sqlite.prepare('SELECT * FROM groups WHERE id = ?').get(groupId) as any
       if (!group) throw new Error('Groupe introuvable')
 
-      let generated = 0
-      let currentDate = startDate
+      const effectiveStart = group.start_date && startDate < group.start_date ? group.start_date : startDate
+      const effectiveEnd = group.end_date && endDate > group.end_date ? group.end_date : endDate
 
-      while (currentDate <= endDate) {
+      let generated = 0
+      let currentDate = effectiveStart
+
+      while (currentDate <= effectiveEnd) {
         const weekday = getWeekdayFromDate(currentDate)
         const matchingSlots = slots.filter((s) => s.weekday === weekday)
 
@@ -134,6 +137,27 @@ export function registerSessionsHandlers(): void {
         endDate = d.toISOString().slice(0, 10)
       }
 
+      // Clean up any unrecorded open regular sessions outside [startDate, endDate]
+      sqlite.prepare(`
+        DELETE FROM attendance_sessions
+        WHERE group_id = ? AND session_date < ?
+          AND session_type = 'regular'
+          AND status != 'closed'
+          AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records)
+          AND id NOT IN (SELECT DISTINCT session_id FROM payments WHERE session_id IS NOT NULL)
+      `).run(groupId, startDate)
+
+      if (group.end_date) {
+        sqlite.prepare(`
+          DELETE FROM attendance_sessions
+          WHERE group_id = ? AND session_date > ?
+            AND session_type = 'regular'
+            AND status != 'closed'
+            AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records)
+            AND id NOT IN (SELECT DISTINCT session_id FROM payments WHERE session_id IS NOT NULL)
+        `).run(groupId, group.end_date)
+      }
+
       let generated = 0
       let currentDate = startDate
 
@@ -183,10 +207,34 @@ export function registerSessionsHandlers(): void {
       DELETE FROM attendance_sessions
       WHERE group_id = ? AND session_date > ?
         AND session_type = 'regular'
+        AND status != 'closed'
         AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records)
+        AND id NOT IN (SELECT DISTINCT session_id FROM payments WHERE session_id IS NOT NULL)
     `).run(groupId, afterDate)
 
     log.info(`Trimmed ${result.changes} future sessions for group ${groupId} after ${afterDate}`)
+    return { removed: result.changes }
+  })
+
+  // ─── Trim sessions before a new start date ──────────────────────────────────
+
+  handle('sessions:trimBeforeDate', async (payload) => {
+    const { groupId, beforeDate } = z.object({
+      groupId: z.number().int().positive(),
+      beforeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(payload)
+    const sqlite = getSqlite()
+
+    const result = sqlite.prepare(`
+      DELETE FROM attendance_sessions
+      WHERE group_id = ? AND session_date < ?
+        AND session_type = 'regular'
+        AND status != 'closed'
+        AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records)
+        AND id NOT IN (SELECT DISTINCT session_id FROM payments WHERE session_id IS NOT NULL)
+    `).run(groupId, beforeDate)
+
+    log.info(`Trimmed ${result.changes} past sessions for group ${groupId} before ${beforeDate}`)
     return { removed: result.changes }
   })
 

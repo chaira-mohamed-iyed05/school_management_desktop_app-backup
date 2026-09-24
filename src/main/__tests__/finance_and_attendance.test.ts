@@ -432,5 +432,73 @@ describe('Student Deletion Financial Settlement & Historical Attendance Preserva
   })
 })
 
+describe('Group Schedule Date Boundaries & Safe Session Trimming', () => {
+  it('filters schedule slot occurrences strictly between group startDate and endDate', () => {
+    const groupStartDate = '2026-09-24'
+    const groupEndDate: string | null = '2026-12-31'
+
+    const testDates = [
+      '2026-01-01', // Before start -> INVALID
+      '2026-06-15', // Before start -> INVALID
+      '2026-09-23', // Day before start -> INVALID
+      '2026-09-24', // On start date -> VALID
+      '2026-10-15', // Inside range -> VALID
+      '2026-12-31', // On end date -> VALID
+      '2027-01-01', // After end date -> INVALID
+    ]
+
+    const validDates = testDates.filter(
+      (d) => d >= groupStartDate && (!groupEndDate || d <= groupEndDate)
+    )
+
+    expect(validDates).toEqual(['2026-09-24', '2026-10-15', '2026-12-31'])
+  })
+
+  it('safely trims open unrecorded sessions while protecting closed sessions and attendance records', () => {
+    const newStartDate = '2026-09-24'
+
+    const sessions = [
+      { id: 101, date: '2026-01-15', status: 'open', hasAttendance: false, hasPayment: false },
+      { id: 102, date: '2026-05-20', status: 'open', hasAttendance: false, hasPayment: false },
+      { id: 103, date: '2026-09-01', status: 'closed', hasAttendance: true, hasPayment: false }, // Closed!
+      { id: 104, date: '2026-09-07', status: 'closed', hasAttendance: true, hasPayment: true },  // Closed + Paid!
+      { id: 105, date: '2026-09-10', status: 'open', hasAttendance: true, hasPayment: false },   // Has attendance!
+      { id: 106, date: '2026-09-24', status: 'open', hasAttendance: false, hasPayment: false }, // After newStartDate
+    ]
+
+    // Simulate safe trimBeforeDate query:
+    // DELETE WHERE session_date < newStartDate AND status != 'closed' AND !hasAttendance AND !hasPayment
+    const remaining = sessions.filter((s) => {
+      const isBefore = s.date < newStartDate
+      const canDelete = isBefore && s.status !== 'closed' && !s.hasAttendance && !s.hasPayment
+      return !canDelete
+    })
+
+    // Deleted: 101, 102
+    // Kept: 103 (closed), 104 (closed+paid), 105 (has attendance), 106 (on/after startDate)
+    expect(remaining.map((s) => s.id)).toEqual([103, 104, 105, 106])
+  })
+
+  it('safely trims future sessions while protecting closed and attended sessions', () => {
+    const newEndDate = '2026-10-31'
+
+    const sessions = [
+      { id: 201, date: '2026-10-15', status: 'open', hasAttendance: false, hasPayment: false },
+      { id: 202, date: '2026-11-05', status: 'open', hasAttendance: false, hasPayment: false }, // After end -> delete
+      { id: 203, date: '2026-11-12', status: 'closed', hasAttendance: true, hasPayment: true }, // After end but CLOSED! -> keep
+      { id: 204, date: '2026-12-01', status: 'open', hasAttendance: false, hasPayment: false }, // After end -> delete
+    ]
+
+    const remaining = sessions.filter((s) => {
+      const isAfter = s.date > newEndDate
+      const canDelete = isAfter && s.status !== 'closed' && !s.hasAttendance && !s.hasPayment
+      return !canDelete
+    })
+
+    expect(remaining.map((s) => s.id)).toEqual([201, 203])
+  })
+})
+
+
 
 

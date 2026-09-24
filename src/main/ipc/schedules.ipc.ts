@@ -109,7 +109,7 @@ export function registerSchedulesHandlers(): void {
         if (group) {
           let endDate = group.end_date
           if (!endDate) {
-            const d = new Date(); d.setFullYear(d.getFullYear() + 1)
+            const d = new Date(group.start_date + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1)
             endDate = d.toISOString().slice(0, 10)
           }
           let currentDate = group.start_date as string

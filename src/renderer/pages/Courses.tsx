@@ -210,9 +210,20 @@ export default function Courses() {
       } as any)
 
       if (res.success) {
-        // If end date changed, handle trimming/generation
-        if (newEndDate && newEndDate !== (editingGroup as any).endDate) {
+        const newStartDate = groupForm.startDate
+        const oldStartDate = editingGroup.startDate
+        const oldEndDate = (editingGroup as any).endDate
+
+        // If start date changed, trim any unrecorded past sessions before new start date
+        if (newStartDate && newStartDate !== oldStartDate) {
+          await window.schoolApp.sessions.trimBeforeDate(editingGroup.id, newStartDate)
+        }
+        // If end date changed and specified, trim any unrecorded future sessions after new end date
+        if (newEndDate && newEndDate !== oldEndDate) {
           await window.schoolApp.sessions.trimAfterDate(editingGroup.id, newEndDate)
+        }
+        // If dates changed, ensure full session schedule is refreshed
+        if (newStartDate !== oldStartDate || newEndDate !== oldEndDate) {
           await window.schoolApp.sessions.generateForGroup(editingGroup.id)
         }
         setEditingGroup(null)
@@ -266,12 +277,8 @@ export default function Courses() {
       if (newEndDate) {
         // If end date shortened, trim future sessions
         await window.schoolApp.sessions.trimAfterDate(group.id, newEndDate)
-        // If end date extended, generate new sessions
-        const currentEnd = (group as any).endDate
-        if (!currentEnd || newEndDate > currentEnd) {
-          await window.schoolApp.sessions.generateForGroup(group.id)
-        }
       }
+      await window.schoolApp.sessions.generateForGroup(group.id)
       await loadData()
     } catch (err) {
       console.error('Failed to update end date:', err)
