@@ -13,6 +13,7 @@ import Courses from './pages/Courses'
 import Attendance from './pages/Attendance'
 import AttendanceHistory from './pages/AttendanceHistory'
 import Payments from './pages/Payments'
+import TeacherPayouts from './pages/TeacherPayouts'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Backups from './pages/Backups'
@@ -94,6 +95,7 @@ function AppRoutes() {
         <Route path="attendance" element={<Attendance />} />
         <Route path="attendance/history" element={<AttendanceHistory />} />
         <Route path="payments" element={<Payments />} />
+        <Route path="teacher-payouts" element={<TeacherPayouts />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="backups" element={<Backups />} />

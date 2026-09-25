@@ -521,6 +521,115 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         VALUES('schema_version', '9', datetime('now'));
     `,
   },
+  {
+    version: 10,
+    name: 'teacher_payouts_and_traffic_light_system',
+    sql: `
+      -- 1. Create teacher_payouts table
+      CREATE TABLE IF NOT EXISTS teacher_payouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payout_number TEXT NOT NULL UNIQUE,
+        teacher_id INTEGER NOT NULL REFERENCES teachers(id),
+        group_id INTEGER NOT NULL REFERENCES groups(id),
+        payout_date TEXT NOT NULL,
+        sessions_count INTEGER NOT NULL DEFAULT 0,
+        yellows_converted_count INTEGER NOT NULL DEFAULT 0,
+        gross_amount REAL NOT NULL DEFAULT 0,
+        percentage REAL NOT NULL DEFAULT 0,
+        net_paid_amount REAL NOT NULL DEFAULT 0,
+        pending_debt_amount REAL NOT NULL DEFAULT 0,
+        payment_method TEXT NOT NULL DEFAULT 'cash',
+        notes TEXT,
+        created_by INTEGER NOT NULL REFERENCES administrators(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_payouts_number ON teacher_payouts(payout_number);
+      CREATE INDEX IF NOT EXISTS idx_teacher_payouts_teacher ON teacher_payouts(teacher_id);
+      CREATE INDEX IF NOT EXISTS idx_teacher_payouts_group ON teacher_payouts(group_id);
+      CREATE INDEX IF NOT EXISTS idx_teacher_payouts_date ON teacher_payouts(payout_date);
+
+      -- 2. Create teacher_payout_items table
+      CREATE TABLE IF NOT EXISTS teacher_payout_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payout_id INTEGER REFERENCES teacher_payouts(id),
+        session_id INTEGER NOT NULL REFERENCES attendance_sessions(id),
+        student_id INTEGER NOT NULL REFERENCES students(id),
+        enrollment_id INTEGER NOT NULL REFERENCES enrollments(id),
+        attendance_status TEXT NOT NULL,
+        student_balance_at_session REAL NOT NULL DEFAULT 0,
+        state TEXT NOT NULL DEFAULT 'yellow' CHECK(state IN ('red', 'yellow', 'green')),
+        session_price REAL NOT NULL DEFAULT 0,
+        teacher_percentage REAL NOT NULL DEFAULT 0,
+        teacher_share REAL NOT NULL DEFAULT 0,
+        paid_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payout_item_session_student ON teacher_payout_items(session_id, student_id);
+      CREATE INDEX IF NOT EXISTS idx_payout_item_payout ON teacher_payout_items(payout_id);
+      CREATE INDEX IF NOT EXISTS idx_payout_item_session ON teacher_payout_items(session_id);
+      CREATE INDEX IF NOT EXISTS idx_payout_item_student ON teacher_payout_items(student_id);
+
+      -- 3. Add teacher_payout_id column to attendance_sessions
+      ALTER TABLE attendance_sessions ADD COLUMN teacher_payout_id INTEGER REFERENCES teacher_payouts(id);
+
+      -- 4. Recreate payments table to allow nullable student_id and enrollment_id, plus add teacher_id and teacher_payout_id
+      CREATE TABLE IF NOT EXISTS payments_v10 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_number TEXT NOT NULL UNIQUE,
+        student_id INTEGER REFERENCES students(id),
+        enrollment_id INTEGER REFERENCES enrollments(id),
+        teacher_id INTEGER REFERENCES teachers(id),
+        teacher_payout_id INTEGER REFERENCES teacher_payouts(id),
+        billing_period TEXT NOT NULL DEFAULT '',
+        amount REAL NOT NULL,
+        payment_type TEXT NOT NULL DEFAULT 'credit',
+        session_id INTEGER REFERENCES attendance_sessions(id),
+        payment_method TEXT NOT NULL DEFAULT 'cash',
+        payment_date TEXT NOT NULL,
+        reference TEXT,
+        notes TEXT,
+        received_by INTEGER NOT NULL REFERENCES administrators(id),
+        status TEXT NOT NULL DEFAULT 'paid',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO payments_v10 (
+        id, receipt_number, student_id, enrollment_id, billing_period,
+        amount, payment_type, session_id, payment_method, payment_date,
+        reference, notes, received_by, status, created_at, updated_at
+      )
+      SELECT
+        id, receipt_number, student_id, enrollment_id, billing_period,
+        amount, payment_type, session_id, payment_method, payment_date,
+        reference, notes, received_by, status, created_at, updated_at
+      FROM payments;
+
+      DROP TABLE payments;
+      ALTER TABLE payments_v10 RENAME TO payments;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_receipt ON payments(receipt_number);
+      CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_teacher ON payments(teacher_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_teacher_payout ON payments(teacher_payout_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date);
+      CREATE INDEX IF NOT EXISTS idx_payments_period ON payments(billing_period);
+      CREATE INDEX IF NOT EXISTS idx_payments_enrollment_type ON payments(enrollment_id, payment_type, status);
+      CREATE INDEX IF NOT EXISTS idx_payments_session ON payments(session_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_status_period ON payments(status, billing_period);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_session_deduction
+        ON payments(enrollment_id, session_id, payment_type)
+        WHERE payment_type IN ('deduction', 'session_charge') AND status = 'paid';
+
+      -- 5. Update schema version
+      INSERT OR REPLACE INTO app_metadata(key, value, updated_at)
+        VALUES('schema_version', '10', datetime('now'));
+    `,
+  },
 ]
 
 // ─── Migration runner ─────────────────────────────────────────────────────────

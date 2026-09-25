@@ -1,7 +1,7 @@
 appId: com.edupilot.dz
 productName: Edupilot DZ
 copyright: Copyright © 2026 Edupilot DZ
-buildVersion: 1.0.14
+buildVersion: 1.0.15
 
 directories:
   output: release

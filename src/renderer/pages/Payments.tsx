@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import {
   Plus, Search, Printer, X, TrendingUp, AlertTriangle, CheckCircle2, Clock,
-  BookOpen, AlertCircle, CreditCard, ChevronDown, Filter
+  BookOpen, AlertCircle, CreditCard, ChevronDown, Filter, Wallet
 } from 'lucide-react'
 import schoolLogo from '../assets/school-logo-cropped.png'
 import QRCode from 'qrcode'
-import type { Payment, Student, Enrollment, Group, Course, SchoolSettings } from '@shared/types/index'
+import type { Payment, Student, Enrollment, Group, Course, SchoolSettings, TeacherPayoutReceiptTicket } from '@shared/types/index'
 import { useConfirm } from '../components/feedback/DialogProvider'
+import TeacherPayoutTicketModal from '../components/TeacherPayoutTicketModal'
 
 interface PaymentSummary {
   monthRevenue: number
@@ -254,6 +255,7 @@ export default function Payments() {
   const [receiptQrDataUrl, setReceiptQrDataUrl] = useState<string | null>(null)
   const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
+  const [teacherTicketModal, setTeacherTicketModal] = useState<TeacherPayoutReceiptTicket | null>(null)
 
   // Multi-course payment state
   const [courseItems, setCourseItems] = useState<CoursePaymentItem[]>([])
@@ -671,8 +673,22 @@ export default function Payments() {
                 <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-4 py-3 font-mono text-[10px] text-slate-600">{p.receiptNumber}</td>
                   <td className="px-4 py-3 font-medium text-[#0F172A]">
-                    <div>{p.studentName ?? `#${p.studentId}`}</div>
-                    {p.studentNumber && <div className="text-[10px] text-slate-400 font-mono">{p.studentNumber}</div>}
+                    {p.paymentType === 'teacher_payout' ? (
+                      <div>
+                        <div className="text-purple-700 font-bold flex items-center gap-1.5">
+                          <Wallet size={12} className="shrink-0" />
+                          <span>{p.teacherName || p.studentName || '—'}</span>
+                        </div>
+                        <div className="text-[10px] text-purple-500 font-medium">
+                          {lang === 'ar' ? 'أستاذ / المستفيد' : 'Enseignant / Bénéficiaire'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div>{p.studentName ?? `#${p.studentId}`}</div>
+                        {p.studentNumber && <div className="text-[10px] text-slate-400 font-mono">{p.studentNumber}</div>}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-600 text-[11px]">
                     {p.groupName ?? '—'}
@@ -683,17 +699,19 @@ export default function Payments() {
                       p.paymentType === 'deduction' ? 'bg-blue-100 text-blue-700' :
                       p.paymentType === 'transfer_in' ? 'bg-teal-100 text-teal-700' :
                       p.paymentType === 'transfer_out' ? 'bg-amber-100 text-amber-700' :
+                      p.paymentType === 'teacher_payout' ? 'bg-purple-100 text-purple-700 font-bold' :
                       'bg-red-100 text-red-700'
                     }`}>
                       {p.paymentType === 'credit' ? (lang === 'ar' ? 'شحن' : lang === 'en' ? 'Credit' : 'Crédit') :
                        p.paymentType === 'deduction' ? (lang === 'ar' ? 'حصة' : lang === 'en' ? 'Session' : 'Séance') :
                        p.paymentType === 'transfer_in' ? (lang === 'ar' ? 'تحويل+' : 'Transfer+') :
                        p.paymentType === 'transfer_out' ? (lang === 'ar' ? 'تحويل-' : 'Transfer-') :
+                       p.paymentType === 'teacher_payout' ? (lang === 'ar' ? 'أجر أستاذ' : lang === 'en' ? 'Teacher Payout' : 'Rémunération') :
                        (lang === 'ar' ? 'استرداد' : lang === 'en' ? 'Refund' : 'Remboursement')}
                     </span>
                   </td>
-                  <td className={`px-4 py-3 font-bold ${p.paymentType === 'refund' ? 'text-red-600' : 'text-[#2563EB]'}`}>
-                    {p.paymentType === 'refund' ? `-${p.amount?.toLocaleString()} DA` : `${p.amount?.toLocaleString()} DA`}
+                  <td className={`px-4 py-3 font-bold ${p.paymentType === 'refund' || p.paymentType === 'teacher_payout' ? 'text-red-600' : 'text-[#2563EB]'}`}>
+                    {p.paymentType === 'refund' || p.paymentType === 'teacher_payout' ? `-${p.amount?.toLocaleString()} DA` : `${p.amount?.toLocaleString()} DA`}
                   </td>
                   <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">{p.paymentDate}</td>
                   <td className="px-4 py-3">
@@ -706,6 +724,18 @@ export default function Payments() {
                   <td className="px-4 py-3 text-end flex gap-2 justify-end">
                     <button
                       onClick={async () => {
+                        if (p.paymentType === 'teacher_payout') {
+                          try {
+                            const payoutId = p.teacherPayoutId || p.id
+                            const res = await window.schoolApp.teachers.getPayoutReceipt(payoutId)
+                            if (res?.success && res.data) {
+                              setTeacherTicketModal(res.data)
+                              return
+                            }
+                          } catch (err) {
+                            console.error('Failed to load teacher payout ticket:', err)
+                          }
+                        }
                         try {
                           const details = await window.schoolApp.payments.receiptDetails(p.id)
                           if (details?.success && details.data) {
@@ -718,7 +748,7 @@ export default function Payments() {
                         }
                       }}
                       className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
-                      title={t('payments.printReceipt')}
+                      title={p.paymentType === 'teacher_payout' ? t('teacherPayouts.reprintTicket') : t('payments.printReceipt')}
                     >
                       <Printer size={12} />
                     </button>
@@ -1311,6 +1341,14 @@ export default function Payments() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Teacher Payout Voucher Modal */}
+      {teacherTicketModal && (
+        <TeacherPayoutTicketModal
+          ticket={teacherTicketModal}
+          onClose={() => setTeacherTicketModal(null)}
+        />
       )}
     </div>
   )

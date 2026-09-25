@@ -4,7 +4,7 @@ import type {
   ApiResult, AuthSession, Student, Teacher, Course, Group,
   Enrollment, AttendanceSession, AttendanceRecord, Payment,
   SchoolSettings, BackupInfo, QRScanResult, PaginatedResult,
-  StudentNote
+  StudentNote, TeacherPayout, TeacherPayoutMatrix, TeacherPayoutReceiptTicket
 } from '../shared/types/index'
 
 // ─── Safe invoke helper — wraps every call ───────────────────────────────────
@@ -92,6 +92,20 @@ const api = {
       invoke<boolean>(IPC_CHANNELS.TEACHERS_ARCHIVE, { id }),
     delete: (id: number) =>
       invoke<boolean>(IPC_CHANNELS.TEACHERS_DELETE, { id }),
+    payoutMatrix: (groupId: number) =>
+      invoke<TeacherPayoutMatrix>('teachers:payoutMatrix', { groupId }),
+    executePayout: (data: {
+      groupId: number
+      sessionIds?: number[]
+      percentage: number
+      paymentMethod?: 'cash' | 'transfer' | 'check'
+      notes?: string | null
+    }) =>
+      invoke<TeacherPayoutReceiptTicket>('teachers:executePayout', data),
+    listPayouts: (filters?: { teacherId?: number; groupId?: number }) =>
+      invoke<TeacherPayout[]>('teachers:listPayouts', filters),
+    getPayoutReceipt: (payoutId: number) =>
+      invoke<TeacherPayoutReceiptTicket>('teachers:getPayoutReceipt', { payoutId }),
   },
 
   courses: {

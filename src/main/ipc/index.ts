@@ -8,6 +8,7 @@ import { registerSchedulesHandlers } from './schedules.ipc'
 import { registerSessionsHandlers } from './sessions.ipc'
 import { registerMediaHandlers } from './media.ipc'
 import { registerNotesHandlers } from './notes.ipc'
+import { registerTeacherPayoutHandlers } from './teacher_payouts.ipc'
 import log from 'electron-log'
 
 export function registerAllIpcHandlers(): void {
@@ -21,5 +22,6 @@ export function registerAllIpcHandlers(): void {
   registerSessionsHandlers()
   registerMediaHandlers()
   registerNotesHandlers()
+  registerTeacherPayoutHandlers()
   log.info('All IPC handlers registered')
 }

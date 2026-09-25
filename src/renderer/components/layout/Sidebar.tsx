@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ScanLine,
-  CreditCard, BarChart3, Settings, ChevronLeft, ChevronRight,
+  CreditCard, Wallet, BarChart3, Settings, ChevronLeft, ChevronRight,
   LogOut
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -26,6 +26,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { to: '/courses', icon: BookOpen, label: t('nav.courses') },
     { to: '/attendance', icon: ScanLine, label: t('nav.attendance') },
     { to: '/payments', icon: CreditCard, label: t('nav.payments') },
+    { to: '/teacher-payouts', icon: Wallet, label: t('nav.teacherPayouts') },
     { to: '/reports', icon: BarChart3, label: t('nav.reports') },
     { to: '/settings', icon: Settings, label: t('nav.settings') },
   ]

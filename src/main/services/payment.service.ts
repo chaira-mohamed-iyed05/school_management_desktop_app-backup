@@ -918,6 +918,8 @@ export async function listPayments(opts: {
       OR s.last_name_fr LIKE ?
       OR s.first_name_fr LIKE ?
       OR s.student_number LIKE ?
+      OR t.first_name LIKE ?
+      OR t.last_name LIKE ?
       OR g.name LIKE ?
       OR c.name_fr LIKE ?
       OR c.name_ar LIKE ?
@@ -925,24 +927,26 @@ export async function listPayments(opts: {
       OR p.notes LIKE ?
       OR p.billing_period LIKE ?
     )`
-    params.push(q, q, q, q, q, q, q, q, q, q, q, q)
+    params.push(q, q, q, q, q, q, q, q, q, q, q, q, q, q)
   }
 
   if (opts.type && opts.type !== 'all') {
     where += " AND p.payment_type = ?"
     params.push(opts.type)
   } else if (!opts.allTypes && opts.type !== 'all') {
-    where += " AND p.payment_type = 'credit'" // Default: only show top-ups in main list
+    where += " AND p.payment_type IN ('credit', 'teacher_payout')" // Default: show top-ups and teacher payouts in main list
   }
 
   const rows = sqlite.prepare(`
     SELECT p.*, s.last_name_ar, s.first_name_ar, s.last_name_fr, s.first_name_fr, s.student_number,
-           g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
+           g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr,
+           t.first_name as teacher_first_name, t.last_name as teacher_last_name
     FROM payments p
     LEFT JOIN students s ON p.student_id = s.id
     LEFT JOIN enrollments e ON p.enrollment_id = e.id
     LEFT JOIN groups g ON e.group_id = g.id
     LEFT JOIN courses c ON g.course_id = c.id
+    LEFT JOIN teachers t ON p.teacher_id = t.id
     ${where}
     ORDER BY p.payment_date DESC, p.created_at DESC
     LIMIT ? OFFSET ?
@@ -954,6 +958,7 @@ export async function listPayments(opts: {
     LEFT JOIN enrollments e ON p.enrollment_id = e.id
     LEFT JOIN groups g ON e.group_id = g.id
     LEFT JOIN courses c ON g.course_id = c.id
+    LEFT JOIN teachers t ON p.teacher_id = t.id
     ${where}
   `).get(...params) as any)?.cnt ?? 0
 
@@ -1231,8 +1236,10 @@ function mapPaymentRow(r: any): any {
   return {
     id: r.id,
     receiptNumber: r.receiptNumber ?? r.receipt_number,
-    studentId: r.studentId ?? r.student_id,
-    enrollmentId: r.enrollmentId ?? r.enrollment_id,
+    studentId: r.studentId ?? r.student_id ?? null,
+    enrollmentId: r.enrollmentId ?? r.enrollment_id ?? null,
+    teacherId: r.teacherId ?? r.teacher_id ?? null,
+    teacherPayoutId: r.teacherPayoutId ?? r.teacher_payout_id ?? null,
     billingPeriod: r.billingPeriod ?? r.billing_period ?? '',
     amount: r.amount,
     paymentType: r.paymentType ?? r.payment_type ?? 'credit',
@@ -1248,10 +1255,20 @@ function mapPaymentRow(r: any): any {
 }
 
 function mapRawRow(r: any): any {
+  const teacherFullName = r.teacher_first_name
+    ? `${r.teacher_first_name} ${r.teacher_last_name}`.trim()
+    : undefined
+  const studentFullName = r.last_name_ar
+    ? `${r.last_name_ar} ${r.first_name_ar || ''}`.trim()
+    : (r.last_name_fr ? `${r.last_name_fr} ${r.first_name_fr || ''}`.trim() : undefined)
+
   return {
     ...mapPaymentRow(r),
-    studentName: r.last_name_ar ? `${r.last_name_ar} ${r.first_name_ar}` : undefined,
+    studentName: (r.payment_type === 'teacher_payout' && teacherFullName)
+      ? `الأستاذ: ${teacherFullName}`
+      : studentFullName,
     studentNumber: r.student_number,
+    teacherName: teacherFullName,
     groupName: r.group_name,
     courseNameAr: r.course_name_ar,
     courseNameFr: r.course_name_fr,

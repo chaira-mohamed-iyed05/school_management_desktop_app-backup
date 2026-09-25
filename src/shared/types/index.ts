@@ -158,8 +158,10 @@ export interface AttendanceRecord {
 export interface Payment {
   id: number
   receiptNumber: string
-  studentId: number
-  enrollmentId: number
+  studentId?: number | null
+  enrollmentId?: number | null
+  teacherId?: number | null
+  teacherPayoutId?: number | null
   billingPeriod: string
   amount: number
   paymentType?: string
@@ -175,10 +177,164 @@ export interface Payment {
   // Joined
   studentName?: string
   studentNumber?: string
+  teacherName?: string
   courseName?: string
   groupName?: string
   receivedByName?: string
 }
+
+// ─── Teacher Payouts & Traffic Light Matrix Types ────────────────────────────
+
+export type TrafficLightState = 'red' | 'yellow' | 'green' | 'none'
+
+export interface TeacherPayout {
+  id: number
+  payoutNumber: string
+  teacherId: number
+  groupId: number
+  payoutDate: string
+  sessionsCount: number
+  yellowsConvertedCount: number
+  grossAmount: number
+  percentage: number
+  netPaidAmount: number
+  pendingDebtAmount: number
+  paymentMethod: PaymentMethodType
+  notes: string | null
+  createdBy: number
+  createdAt: string
+  updatedAt: string
+  // Joined
+  teacherName?: string
+  groupName?: string
+  courseName?: string
+  createdByName?: string
+}
+
+export interface TeacherPayoutItem {
+  id: number
+  payoutId?: number | null
+  sessionId: number
+  studentId: number
+  enrollmentId: number
+  attendanceStatus: string
+  studentBalanceAtSession: number
+  state: 'red' | 'yellow' | 'green'
+  sessionPrice: number
+  teacherPercentage: number
+  teacherShare: number
+  paidAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeacherPayoutMatrixSession {
+  id: number
+  sessionDate: string
+  sessionNumber: number
+  sessionType: string
+  status: string
+  price: number
+  yellowCount: number
+  greenCount: number
+  redCount: number
+  totalStudents: number
+  isFullyPaid: boolean
+}
+
+export interface TeacherPayoutMatrixStudentCell {
+  sessionId: number
+  attendanceStatus: 'present' | 'absent' | 'not_active' | 'not_enrolled_yet' | 'cancelled'
+  state: TrafficLightState // 'green' | 'yellow' | 'red' | 'none'
+  sessionPrice: number
+  isPaidToTeacher: boolean
+  payoutId?: number | null
+  teacherShare?: number
+}
+
+export interface TeacherPayoutMatrixStudent {
+  studentId: number
+  enrollmentId: number
+  studentNumber: string
+  studentNameAr: string
+  studentNameFr: string
+  phone: string | null
+  studentStatus: StudentStatus
+  isDeparted: boolean
+  totalBalance: number
+  cells: Record<number, TeacherPayoutMatrixStudentCell>
+}
+
+export interface TeacherPayoutMatrix {
+  group: {
+    id: number
+    name: string
+    courseId: number
+    courseNameAr: string
+    courseNameFr: string
+    teacherId: number
+    teacherName: string
+    monthlyPrice: number
+  }
+  teacher: {
+    id: number
+    name: string
+    phone: string | null
+    defaultPercentage: number
+  }
+  sessions: TeacherPayoutMatrixSession[]
+  students: TeacherPayoutMatrixStudent[]
+  summary: {
+    totalSessions: number
+    readySessionsCount: number
+    totalYellowCount: number
+    totalGreenCount: number
+    totalRedCount: number
+    totalGrossYellowAmount: number
+    totalPendingDebtAmount: number
+    defaultPercentage: number
+    estimatedNetPayout: number
+  }
+}
+
+export interface TeacherPayoutReceiptTicket {
+  payout: TeacherPayout
+  group: {
+    id: number
+    name: string
+    courseNameAr: string
+    courseNameFr: string
+  }
+  teacher: {
+    id: number
+    name: string
+    phone: string | null
+  }
+  schoolSettings?: SchoolSettings
+  paidItems: Array<{
+    sessionId: number
+    sessionDate: string
+    sessionNumber: number
+    studentId: number
+    studentNumber: string
+    studentName: string
+    isDeparted: boolean
+    price: number
+    teacherShare: number
+  }>
+  debtItems: Array<{
+    sessionId: number
+    sessionDate: string
+    sessionNumber: number
+    studentId: number
+    studentNumber: string
+    studentName: string
+    isDeparted: boolean
+    price: number
+    currentBalance: number
+  }>
+}
+
 
 export interface StudentNote {
   id: number

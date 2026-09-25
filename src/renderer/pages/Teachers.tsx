@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Archive, Camera, RefreshCw, BookOpen, Filter, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Archive, Camera, RefreshCw, BookOpen, Filter, Trash2, Wallet } from 'lucide-react'
 import type { Teacher, Course } from '@shared/types/index'
 import { getCourseName } from '../utils/format'
 import { useConfirm } from '../components/feedback/DialogProvider'
@@ -190,9 +191,17 @@ export default function Teachers() {
             {t('teachers.subtitle')}
           </p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-[#2563EB] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1D4ED8] transition-colors shadow-xs">
-          <Plus size={15} /> {t('teachers.add')}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/teacher-payouts"
+            className="flex items-center gap-2 bg-purple-600 text-white px-3.5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors shadow-xs"
+          >
+            <Wallet size={15} /> {t('teachers.payoutsButton')}
+          </Link>
+          <button onClick={openCreate} className="flex items-center gap-2 bg-[#2563EB] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1D4ED8] transition-colors shadow-xs">
+            <Plus size={15} /> {t('teachers.add')}
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs & Course filter */}
@@ -276,6 +285,13 @@ export default function Teachers() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-3 border-t border-slate-100 flex-wrap">
+                  <Link
+                    to={`/teacher-payouts?teacherId=${teacher.id}`}
+                    className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 transition-colors font-semibold"
+                    title={t('teachers.payoutsButton')}
+                  >
+                    <Wallet size={12} /> {t('teachers.payoutsButton')}
+                  </Link>
                   <button onClick={() => openEdit(teacher)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#2563EB] transition-colors font-medium">
                     <Pencil size={11} /> {t('common.edit')}
                   </button>

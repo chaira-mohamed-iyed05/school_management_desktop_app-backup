@@ -181,6 +181,7 @@ export const attendanceSessions = sqliteTable('attendance_sessions', {
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   sessionType: text('session_type', { enum: ['regular', 'extra', 'makeup', 'cancelled'] }).notNull().default('regular'),
   price: integer('price'), // null = default group session price (monthly/4), 0 = free, >0 = custom DA
+  teacherPayoutId: integer('teacher_payout_id').references((): any => teacherPayouts.id),
   scheduleSlotId: integer('schedule_slot_id').references(() => groupScheduleSlots.id),
   cancelledReason: text('cancelled_reason'),
   createdBy: integer('created_by').notNull().references(() => administrators.id),
@@ -191,6 +192,7 @@ export const attendanceSessions = sqliteTable('attendance_sessions', {
   dateIdx: index('idx_sessions_date').on(table.sessionDate),
   typeIdx: index('idx_sessions_type').on(table.sessionType),
   scheduleSlotIdx: index('idx_sessions_schedule_slot').on(table.scheduleSlotId),
+  payoutIdx: index('idx_sessions_payout').on(table.teacherPayoutId),
 }))
 
 // ─── Attendance Records ───────────────────────────────────────────────────────
@@ -215,20 +217,72 @@ export const attendanceRecords = sqliteTable('attendance_records', {
   studentIdx: index('idx_attendance_student').on(table.studentId),
 }))
 
+// ─── Teacher Payouts ─────────────────────────────────────────────────────────
+
+export const teacherPayouts = sqliteTable('teacher_payouts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  payoutNumber: text('payout_number').notNull().unique(),
+  teacherId: integer('teacher_id').notNull().references(() => teachers.id),
+  groupId: integer('group_id').notNull().references(() => groups.id),
+  payoutDate: text('payout_date').notNull(),
+  sessionsCount: integer('sessions_count').notNull().default(0),
+  yellowsConvertedCount: integer('yellows_converted_count').notNull().default(0),
+  grossAmount: real('gross_amount').notNull().default(0),
+  percentage: real('percentage').notNull().default(0),
+  netPaidAmount: real('net_paid_amount').notNull().default(0),
+  pendingDebtAmount: real('pending_debt_amount').notNull().default(0),
+  paymentMethod: text('payment_method', { enum: ['cash', 'transfer', 'check'] }).notNull().default('cash'),
+  notes: text('notes'),
+  createdBy: integer('created_by').notNull().references(() => administrators.id),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => ({
+  payoutNumberIdx: uniqueIndex('idx_teacher_payouts_number').on(table.payoutNumber),
+  teacherIdx: index('idx_teacher_payouts_teacher').on(table.teacherId),
+  groupIdx: index('idx_teacher_payouts_group').on(table.groupId),
+  dateIdx: index('idx_teacher_payouts_date').on(table.payoutDate),
+}))
+
+// ─── Teacher Payout Items ───────────────────────────────────────────────────
+
+export const teacherPayoutItems = sqliteTable('teacher_payout_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  payoutId: integer('payout_id').references(() => teacherPayouts.id),
+  sessionId: integer('session_id').notNull().references(() => attendanceSessions.id),
+  studentId: integer('student_id').notNull().references(() => students.id),
+  enrollmentId: integer('enrollment_id').notNull().references(() => enrollments.id),
+  attendanceStatus: text('attendance_status').notNull(),
+  studentBalanceAtSession: real('student_balance_at_session').notNull().default(0),
+  state: text('state', { enum: ['red', 'yellow', 'green'] }).notNull().default('yellow'),
+  sessionPrice: real('session_price').notNull().default(0),
+  teacherPercentage: real('teacher_percentage').notNull().default(0),
+  teacherShare: real('teacher_share').notNull().default(0),
+  paidAt: text('paid_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => ({
+  uniqueSessionStudent: uniqueIndex('idx_payout_item_session_student').on(table.sessionId, table.studentId),
+  payoutIdx: index('idx_payout_item_payout').on(table.payoutId),
+  sessionIdx: index('idx_payout_item_session').on(table.sessionId),
+  studentIdx: index('idx_payout_item_student').on(table.studentId),
+}))
+
 // ─── Payments ────────────────────────────────────────────────────────────────
 
 export const payments = sqliteTable('payments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   receiptNumber: text('receipt_number').notNull().unique(),
-  studentId: integer('student_id').notNull().references(() => students.id),
-  enrollmentId: integer('enrollment_id').notNull().references(() => enrollments.id),
+  studentId: integer('student_id').references(() => students.id),
+  enrollmentId: integer('enrollment_id').references(() => enrollments.id),
+  teacherId: integer('teacher_id').references(() => teachers.id),
+  teacherPayoutId: integer('teacher_payout_id').references(() => teacherPayouts.id),
   billingPeriod: text('billing_period').notNull().default(''),
   amount: real('amount').notNull(),
   paymentType: text('payment_type', {
     enum: [
       'credit', 'deduction', 'transfer_in', 'transfer_out', 'refund',
       'payment', 'session_charge', 'session_refund', 'enrollment_refund',
-      'payment_cancellation', 'manual_adjustment'
+      'payment_cancellation', 'manual_adjustment', 'teacher_payout'
     ]
   }).notNull().default('credit'),
   sessionId: integer('session_id').references(() => attendanceSessions.id),
@@ -243,6 +297,8 @@ export const payments = sqliteTable('payments', {
 }, (table) => ({
   receiptIdx: uniqueIndex('idx_payments_receipt').on(table.receiptNumber),
   studentIdx: index('idx_payments_student').on(table.studentId),
+  teacherIdx: index('idx_payments_teacher').on(table.teacherId),
+  teacherPayoutIdx: index('idx_payments_teacher_payout').on(table.teacherPayoutId),
   dateIdx: index('idx_payments_date').on(table.paymentDate),
   periodIdx: index('idx_payments_period').on(table.billingPeriod),
 }))
@@ -328,3 +384,9 @@ export type SelectGroupScheduleSlot = typeof groupScheduleSlots.$inferSelect
 
 export type InsertStudentNote = typeof studentNotes.$inferInsert
 export type SelectStudentNote = typeof studentNotes.$inferSelect
+
+export type InsertTeacherPayout = typeof teacherPayouts.$inferInsert
+export type SelectTeacherPayout = typeof teacherPayouts.$inferSelect
+
+export type InsertTeacherPayoutItem = typeof teacherPayoutItems.$inferInsert
+export type SelectTeacherPayoutItem = typeof teacherPayoutItems.$inferSelect

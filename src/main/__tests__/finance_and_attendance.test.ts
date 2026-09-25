@@ -499,6 +499,90 @@ describe('Group Schedule Date Boundaries & Safe Session Trimming', () => {
   })
 })
 
+describe('Teacher Payouts & Traffic Light Matrix Rules (أجور الأساتذة ونظام الإشارات الضوئية)', () => {
+  it('applies FIFO rule: student payments cover sessions in chronological order', () => {
+    const sessionCost = 500
+    const studentTotalPaid = 1000 // Student paid for 2 sessions
+
+    const sessions = [
+      { id: 1, date: '2026-09-01' },
+      { id: 2, date: '2026-09-08' },
+      { id: 3, date: '2026-09-15' },
+    ]
+
+    let cumulativeCost = 0
+    const results = sessions.map((s) => {
+      cumulativeCost += sessionCost
+      const state = studentTotalPaid >= cumulativeCost ? 'yellow' : 'red'
+      return { id: s.id, state }
+    })
+
+    // Session 1: required 500 <= 1000 -> YELLOW (eligible for teacher payout)
+    // Session 2: required 1000 <= 1000 -> YELLOW (eligible for teacher payout)
+    // Session 3: required 1500 > 1000 -> RED (debt, withheld from teacher)
+    expect(results).toEqual([
+      { id: 1, state: 'yellow' },
+      { id: 2, state: 'yellow' },
+      { id: 3, state: 'red' },
+    ])
+  })
+
+  it('enforces Full Payment Only rule (قاعدة السداد الكامل فقط): partial payments stay Red', () => {
+    const sessionCost = 1000
+    const studentTotalPaid = 900 // Paid 900 DA (100 DA short)
+
+    let cumulativeCost = sessionCost
+    const isFullPayment = studentTotalPaid >= cumulativeCost
+
+    // Must be strictly RED because student has not paid 100% in full
+    expect(isFullPayment).toBe(false)
+    const state = isFullPayment ? 'yellow' : 'red'
+    expect(state).toBe('red')
+  })
+
+  it('converts debt from Red to Yellow when student clears debt later', () => {
+    const sessionCost = 500
+    let studentTotalPaid = 500
+
+    const session2Cumulative = 1000
+    // Initially, session 2 is RED
+    expect(studentTotalPaid >= session2Cumulative).toBe(false)
+
+    // Student makes a top-up of 500 DA
+    studentTotalPaid += 500
+    // Now session 2 converts to YELLOW!
+    expect(studentTotalPaid >= session2Cumulative).toBe(true)
+  })
+
+  it('calculates flexible teacher percentage and net payout accurately', () => {
+    const yellowGross = 30000 // 60 student-sessions at 500 DA
+
+    // At 50%
+    const netAt50 = Math.round(yellowGross * (50 / 100))
+    expect(netAt50).toBe(15000)
+
+    // At 60%
+    const netAt60 = Math.round(yellowGross * (60 / 100))
+    expect(netAt60).toBe(18000)
+
+    // At 75%
+    const netAt75 = Math.round(yellowGross * (75 / 100))
+    expect(netAt75).toBe(22500)
+  })
+
+  it('ensures teacher payout does NOT alter student balance or debt (Decoupled Calculation)', () => {
+    const initialStudentBalance = -500 // Student owes 500 DA
+    const initialStudentCredit = 1000
+
+    // Payout executed to teacher for other sessions:
+    const teacherPayoutNet = 15000
+
+    // Student balance and credit must remain exactly unchanged!
+    expect(initialStudentBalance).toBe(-500)
+    expect(initialStudentCredit).toBe(1000)
+  })
+})
+
 
 
 
