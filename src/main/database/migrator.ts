@@ -523,6 +523,15 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
   },
   {
     version: 10,
+    name: 'printer_settings_placeholder',
+    sql: `
+      -- Schema version 10 placeholder (printer settings migration)
+      INSERT OR REPLACE INTO app_metadata(key, value, updated_at)
+        VALUES('schema_version', '10', datetime('now'));
+    `,
+  },
+  {
+    version: 11,
     name: 'teacher_payouts_and_traffic_light_system',
     sql: `
       -- 1. Create teacher_payouts table
@@ -577,7 +586,9 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
       ALTER TABLE attendance_sessions ADD COLUMN teacher_payout_id INTEGER REFERENCES teacher_payouts(id);
 
       -- 4. Recreate payments table to allow nullable student_id and enrollment_id, plus add teacher_id and teacher_payout_id
-      CREATE TABLE IF NOT EXISTS payments_v10 (
+      DROP TABLE IF EXISTS payments_v11;
+
+      CREATE TABLE payments_v11 (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         receipt_number TEXT NOT NULL UNIQUE,
         student_id INTEGER REFERENCES students(id),
@@ -598,7 +609,7 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
-      INSERT INTO payments_v10 (
+      INSERT INTO payments_v11 (
         id, receipt_number, student_id, enrollment_id, billing_period,
         amount, payment_type, session_id, payment_method, payment_date,
         reference, notes, received_by, status, created_at, updated_at
@@ -610,7 +621,7 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
       FROM payments;
 
       DROP TABLE payments;
-      ALTER TABLE payments_v10 RENAME TO payments;
+      ALTER TABLE payments_v11 RENAME TO payments;
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_receipt ON payments(receipt_number);
       CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
@@ -627,7 +638,7 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
 
       -- 5. Update schema version
       INSERT OR REPLACE INTO app_metadata(key, value, updated_at)
-        VALUES('schema_version', '10', datetime('now'));
+        VALUES('schema_version', '11', datetime('now'));
     `,
   },
 ]
