@@ -672,7 +672,16 @@
     "sessionDate": "Date séance",
     "teacherSignature": "Signature et décharge de l'enseignant",
     "adminSignature": "Cachet et signature de l'administration",
-    "print": "Imprimer le reçu"
+    "print": "Imprimer le reçu",
+    "shortTicket": "Résumé chiffré",
+    "detailedTicket": "Détails par élèves",
+    "sessionCol": "Séance",
+    "paidStudentsCol": "Élèves réglés",
+    "revenueCol": "Recettes",
+    "teacherShareCol": "Part enseignant",
+    "totalSessionsSummary": "Total ({{count}} séances)",
+    "indebtedCount": "Nombre d'élèves en dette",
+    "totalPendingDebt": "Total des dettes en suspens"
   },
   "language": {
     "ar": "العربية",

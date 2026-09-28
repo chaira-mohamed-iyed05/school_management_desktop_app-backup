@@ -672,7 +672,16 @@
     "sessionDate": "تاريخ الحصة",
     "teacherSignature": "توقيع واستلام الأستاذ",
     "adminSignature": "ختم وتوقيع الإدارة",
-    "print": "طباعة الوصل"
+    "print": "طباعة الوصل",
+    "shortTicket": "مختصر بالأرقام",
+    "detailedTicket": "تفصيلي بالأسماء",
+    "sessionCol": "الحصة",
+    "paidStudentsCol": "الطلاب المسددين",
+    "revenueCol": "المداخيل",
+    "teacherShareCol": "حصة الأستاذ",
+    "totalSessionsSummary": "المجموع ({{count}} حصص)",
+    "indebtedCount": "عدد الطلاب المعلقة ديونهم",
+    "totalPendingDebt": "مجموع الديون المعلقة المحجوبة"
   },
   "language": {
     "ar": "العربية",

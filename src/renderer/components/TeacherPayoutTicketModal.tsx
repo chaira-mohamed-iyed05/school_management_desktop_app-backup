@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Printer, X, CheckCircle2, AlertTriangle, UserCheck, Calendar } from 'lucide-react'
+import { Printer, X, CheckCircle2, AlertTriangle } from 'lucide-react'
 import schoolLogo from '../assets/school-logo-cropped.png'
 import type { TeacherPayoutReceiptTicket } from '@shared/types/index'
 
@@ -12,8 +12,8 @@ interface TeacherPayoutTicketModalProps {
 export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPayoutTicketModalProps) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
-  const isRTL = lang === 'ar'
   const [format, setFormat] = useState<'thermal' | 'a4'>('thermal')
+  const [showStudentDetails, setShowStudentDetails] = useState<boolean>(false)
 
   const { payout, group, teacher, schoolSettings, paidItems, debtItems } = ticket
 
@@ -64,6 +64,7 @@ export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPay
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Format Selector */}
             <div className="flex bg-slate-200 p-0.5 rounded-lg text-xs font-medium">
               <button
                 type="button"
@@ -84,6 +85,20 @@ export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPay
                 A4 قياسي
               </button>
             </div>
+
+            {/* Toggle Summary (Totals Only) vs Detailed (Student Names) */}
+            <button
+              type="button"
+              onClick={() => setShowStudentDetails(!showStudentDetails)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                showStudentDetails
+                  ? 'bg-purple-100 text-purple-800 border-purple-300'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+              title={showStudentDetails ? t('teacherPayouts.shortTicket') : t('teacherPayouts.detailedTicket')}
+            >
+              {showStudentDetails ? `📋 ${t('teacherPayouts.detailedTicket')}` : `🔢 ${t('teacherPayouts.shortTicket')}`}
+            </button>
 
             <button
               onClick={handlePrint}
@@ -108,7 +123,7 @@ export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPay
             id="teacher-payout-ticket"
             className={`bg-white shadow-md border border-slate-300 text-black leading-tight select-text ${
               format === 'thermal'
-                ? 'w-[72mm] p-2 text-[11px] font-mono'
+                ? 'w-[72mm] p-2 text-[10.5px] font-mono'
                 : 'w-[180mm] p-8 text-xs font-sans rounded-xl'
             }`}
             style={{ WebkitFontSmoothing: 'antialiased' }}
@@ -175,41 +190,94 @@ export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPay
                   <CheckCircle2 size={12} className="text-emerald-600" />
                   <span>الحصص والاشتراكات المسددة اليوم (خضراء 🟢):</span>
                 </span>
-                <span className="text-[10px] text-slate-600">{paidItems.length} طالب</span>
+                <span className="text-[10px] text-slate-700 font-bold font-mono">
+                  {paidItems.length} طالب ({itemsBySession.size} حصص)
+                </span>
               </div>
 
-              {Array.from(itemsBySession.entries()).map(([sid, items]) => {
-                const sessionDate = items[0]?.sessionDate || ''
-                const sessionNum = items[0]?.sessionNumber || ''
-                const sessionGross = items.reduce((sum, it) => sum + it.price, 0)
-                const sessionTeacherShare = items.reduce((sum, it) => sum + it.teacherShare, 0)
+              {/* Mode A: Shortened Totals Table (Default) */}
+              {!showStudentDetails ? (
+                <div className="border border-slate-300 rounded overflow-hidden mb-2">
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-300 text-slate-700 text-[9px] bg-slate-100">
+                        <th className="py-1 px-1.5 text-start font-bold">{t('teacherPayouts.sessionCol')}</th>
+                        <th className="py-1 px-1 text-center font-bold">{t('teacherPayouts.paidStudentsCol')}</th>
+                        <th className="py-1 px-1 text-end font-bold">{t('teacherPayouts.revenueCol')}</th>
+                        <th className="py-1 px-1.5 text-end font-bold text-purple-900">{t('teacherPayouts.teacherShareCol')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {Array.from(itemsBySession.entries()).map(([sid, items]) => {
+                        const sessionDate = items[0]?.sessionDate || ''
+                        const sessionNum = items[0]?.sessionNumber || ''
+                        const sessionGross = items.reduce((sum, it) => sum + it.price, 0)
+                        const sessionTeacherShare = items.reduce((sum, it) => sum + it.teacherShare, 0)
 
-                return (
-                  <div key={sid} className="mb-2 bg-slate-50/70 p-2 rounded border border-slate-200">
-                    <div className="flex justify-between items-center text-[10px] font-bold border-b border-slate-200 pb-1 mb-1">
-                      <span>حصـة رقم #{sessionNum} ({sessionDate})</span>
-                      <span className="text-purple-700">حصة الأستاذ: {sessionTeacherShare.toLocaleString()} DA</span>
+                        return (
+                          <tr key={sid} className="hover:bg-slate-50">
+                            <td className="py-1 px-1.5 font-semibold text-start whitespace-nowrap">
+                              ح#{sessionNum} <span className="text-[8.5px] text-slate-500 font-mono">({sessionDate})</span>
+                            </td>
+                            <td className="py-1 px-1 text-center font-bold font-mono text-slate-800">
+                              {items.length} طالب
+                            </td>
+                            <td className="py-1 px-1 text-end font-mono text-slate-600 whitespace-nowrap">
+                              {sessionGross.toLocaleString()} DA
+                            </td>
+                            <td className="py-1 px-1.5 text-end font-mono font-bold text-purple-700 whitespace-nowrap">
+                              {sessionTeacherShare.toLocaleString()} DA
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot className="border-t-2 border-black font-bold text-[9.5px] bg-slate-100">
+                      <tr>
+                        <td className="py-1 px-1.5 text-start">
+                          {t('teacherPayouts.totalSessionsSummary', { count: itemsBySession.size })}
+                        </td>
+                        <td className="py-1 px-1 text-center font-mono">{paidItems.length} طالب</td>
+                        <td className="py-1 px-1 text-end font-mono whitespace-nowrap">{payout.grossAmount.toLocaleString()} DA</td>
+                        <td className="py-1 px-1.5 text-end font-mono text-purple-900 whitespace-nowrap">{payout.netPaidAmount.toLocaleString()} DA</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                /* Mode B: Detailed Student Names Breakdown */
+                Array.from(itemsBySession.entries()).map(([sid, items]) => {
+                  const sessionDate = items[0]?.sessionDate || ''
+                  const sessionNum = items[0]?.sessionNumber || ''
+                  const sessionTeacherShare = items.reduce((sum, it) => sum + it.teacherShare, 0)
+
+                  return (
+                    <div key={sid} className="mb-2 bg-slate-50/70 p-2 rounded border border-slate-200">
+                      <div className="flex justify-between items-center text-[10px] font-bold border-b border-slate-200 pb-1 mb-1">
+                        <span>حصـة رقم #{sessionNum} ({sessionDate})</span>
+                        <span className="text-purple-700">حصة الأستاذ: {sessionTeacherShare.toLocaleString()} DA</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {items.map((it, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-[9.5px]">
+                            <span className="truncate max-w-[50mm]">
+                              • {it.studentName}
+                              {it.isDeparted && (
+                                <span className="ms-1 text-[8px] bg-red-100 text-red-700 px-1 rounded">
+                                  [غادر المركز]
+                                </span>
+                              )}
+                            </span>
+                            <span className="font-mono text-slate-600 shrink-0">
+                              {it.price.toLocaleString()} DA
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-0.5">
-                      {items.map((it, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-[9.5px]">
-                          <span className="truncate max-w-[50mm]">
-                            • {it.studentName}
-                            {it.isDeparted && (
-                              <span className="ms-1 text-[8px] bg-red-100 text-red-700 px-1 rounded">
-                                [غادر المركز]
-                              </span>
-                            )}
-                          </span>
-                          <span className="font-mono text-slate-600 shrink-0">
-                            {it.price.toLocaleString()} DA
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
 
             {/* Net Payout Summary Highlight Box */}
@@ -240,34 +308,52 @@ export default function TeacherPayoutTicketModal({ ticket, onClose }: TeacherPay
                   <AlertTriangle size={12} className="text-red-600" />
                   <span>{t('teacherPayouts.indebtedStudents')}</span>
                 </span>
-                <span className="text-[9.5px] font-mono">
+                <span className="text-[9.5px] font-mono font-bold">
                   {debtItems.length > 0 ? `${debtItems.length} ديون معلقة` : '0'}
                 </span>
               </div>
 
               {debtItems.length > 0 ? (
-                <div className="space-y-1 bg-red-50/60 p-2 rounded-lg border border-red-200">
-                  {debtItems.map((deb, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-[9px] text-red-900">
-                      <span className="truncate max-w-[48mm]">
-                        • {deb.studentName} (ح#{deb.sessionNumber} - {deb.sessionDate})
-                        {deb.isDeparted && (
-                          <span className="ms-1 text-[8px] bg-red-200 px-1 rounded">[غادر]</span>
-                        )}
-                      </span>
-                      <span className="font-mono font-bold text-red-700 shrink-0">
-                        {deb.price.toLocaleString()} DA
-                      </span>
+                !showStudentDetails ? (
+                  /* Shortened Debts Box (Default) */
+                  <div className="bg-red-50/70 p-2 rounded-lg border border-red-200 text-[10px] space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-red-900 font-bold">{t('teacherPayouts.indebtedCount')}:</span>
+                      <span className="font-bold text-red-900 font-mono">{debtItems.length} طالب</span>
                     </div>
-                  ))}
-                  <div className="border-t border-red-200 pt-1 mt-1 flex justify-between font-bold text-[9.5px] text-red-800">
-                    <span>مجموع الديون المعلقة المحجوبة:</span>
-                    <span className="font-mono">{payout.pendingDebtAmount.toLocaleString()} DA</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-red-900 font-bold">{t('teacherPayouts.totalPendingDebt')}:</span>
+                      <span className="font-mono font-bold text-red-700">{payout.pendingDebtAmount.toLocaleString()} DA</span>
+                    </div>
+                    <p className="text-[8px] text-slate-500 italic mt-0.5 border-t border-red-200 pt-1">
+                      * ملاحظة: ستُصرف هذه الحصص للأستاذ تلقائياً فور قيام الطلاب بتسديد ديونهم.
+                    </p>
                   </div>
-                  <p className="text-[8px] text-slate-500 italic mt-0.5">
-                    * ملاحظة: ستُصرف هذه الحصص للأستاذ تلقائياً فور قيام الطالب بتسديد دينه.
-                  </p>
-                </div>
+                ) : (
+                  /* Detailed Debts List */
+                  <div className="space-y-1 bg-red-50/60 p-2 rounded-lg border border-red-200">
+                    {debtItems.map((deb, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-[9px] text-red-900">
+                        <span className="truncate max-w-[48mm]">
+                          • {deb.studentName} (ح#{deb.sessionNumber} - {deb.sessionDate})
+                          {deb.isDeparted && (
+                            <span className="ms-1 text-[8px] bg-red-200 px-1 rounded">[غادر]</span>
+                          )}
+                        </span>
+                        <span className="font-mono font-bold text-red-700 shrink-0">
+                          {deb.price.toLocaleString()} DA
+                        </span>
+                      </div>
+                    ))}
+                    <div className="border-t border-red-200 pt-1 mt-1 flex justify-between font-bold text-[9.5px] text-red-800">
+                      <span>{t('teacherPayouts.totalPendingDebt')}:</span>
+                      <span className="font-mono">{payout.pendingDebtAmount.toLocaleString()} DA</span>
+                    </div>
+                    <p className="text-[8px] text-slate-500 italic mt-0.5">
+                      * ملاحظة: ستُصرف هذه الحصص للأستاذ تلقائياً فور قيام الطلاب بتسديد ديونهم.
+                    </p>
+                  </div>
+                )
               ) : (
                 <div className="text-[9.5px] text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-200 text-center font-medium">
                   ✓ لا توجد ديون معلقة في هذه الحصص، كافة الطلاب خالصين ومسددين 100%.

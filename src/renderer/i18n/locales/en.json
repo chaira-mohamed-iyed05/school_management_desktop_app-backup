@@ -672,7 +672,16 @@
     "sessionDate": "Session Date",
     "teacherSignature": "Teacher Signature & Receipt",
     "adminSignature": "Administration Signature & Stamp",
-    "print": "Print Ticket"
+    "print": "Print Ticket",
+    "shortTicket": "Totals Summary",
+    "detailedTicket": "Student Details",
+    "sessionCol": "Session",
+    "paidStudentsCol": "Paid Students",
+    "revenueCol": "Revenue",
+    "teacherShareCol": "Teacher Share",
+    "totalSessionsSummary": "Total ({{count}} sessions)",
+    "indebtedCount": "Indebted Students Count",
+    "totalPendingDebt": "Total Pending Debts"
   },
   "language": {
     "ar": "العربية",
