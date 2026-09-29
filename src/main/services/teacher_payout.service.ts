@@ -225,10 +225,12 @@ export async function getTeacherPayoutMatrix(groupId: number): Promise<TeacherPa
       if (status === 'present' || status === 'absent') {
         if (sess.price != null && sess.price > 0) {
           sessionPrice = sess.price
+        } else if (group.monthly_price != null && group.monthly_price > 0) {
+          sessionPrice = Math.round(group.monthly_price / 4)
         } else if (st.agreed_price != null && st.agreed_price > 0) {
           sessionPrice = Math.round(st.agreed_price / 4)
         } else {
-          sessionPrice = group.monthly_price ? Math.round(group.monthly_price / 4) : 0
+          sessionPrice = 0
         }
       }
 

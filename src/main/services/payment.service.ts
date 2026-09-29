@@ -317,10 +317,13 @@ export async function topUpMultipleCredit(data: {
       if (existingEnr) {
         finalEnrollmentId = existingEnr.id
       } else {
+        const grp = sqlite.prepare(`SELECT monthly_price FROM groups WHERE id = ?`).get(item.newGroupId) as any
+        const groupMonthlyPrice = (grp?.monthly_price && Number(grp.monthly_price) > 0) ? Number(grp.monthly_price) : item.amount
+
         const newEnr = await db.insert(schema.enrollments).values({
           studentId: data.studentId,
           groupId: item.newGroupId,
-          agreedPrice: item.amount,
+          agreedPrice: groupMonthlyPrice,
           enrollmentDate: data.paymentDate,
           status: 'active',
         }).returning()

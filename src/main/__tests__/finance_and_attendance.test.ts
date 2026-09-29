@@ -583,6 +583,28 @@ describe('Teacher Payouts & Traffic Light Matrix Rules (أجور الأساتذ�
   })
 })
 
+describe('Session Deduction Price Priority (Group Monthly Price authoritative)', () => {
+  it('prioritizes group monthlyPrice over agreedPrice if student paid partial amount upon enrollment', async () => {
+    const { getSessionDeductionPrice } = await import('../services/attendance.service')
 
+    // Scenario: Group is 1500 DA, but agreedPrice was saved as 1125 DA (student paid 3 sessions)
+    const deduction = getSessionDeductionPrice(null, 1125, 1500)
+    expect(deduction).toBe(375) // Exactly 1500 / 4, NOT 281.25!
+  })
 
+  it('respects explicitly configured session-level price if present', async () => {
+    const { getSessionDeductionPrice } = await import('../services/attendance.service')
 
+    // Free session (0 DA)
+    expect(getSessionDeductionPrice(0, 1125, 1500)).toBe(0)
+    // Custom session override (500 DA)
+    expect(getSessionDeductionPrice(500, 1125, 1500)).toBe(500)
+  })
+
+  it('falls back to agreedPrice only when group monthlyPrice is not set or zero', async () => {
+    const { getSessionDeductionPrice } = await import('../services/attendance.service')
+
+    expect(getSessionDeductionPrice(null, 2000, 0)).toBe(500)
+    expect(getSessionDeductionPrice(null, 2000, null)).toBe(500)
+  })
+})

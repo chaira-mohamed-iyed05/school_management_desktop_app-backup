@@ -641,6 +641,21 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         VALUES('schema_version', '11', datetime('now'));
     `,
   },
+  {
+    version: 12,
+    name: 'sync_enrollments_agreed_price_with_group_monthly_price',
+    sql: `
+      -- 1. Sync enrollments agreed_price with group monthly_price where mismatched
+      UPDATE enrollments
+      SET agreed_price = (SELECT monthly_price FROM groups WHERE groups.id = enrollments.group_id)
+      WHERE agreed_price != (SELECT monthly_price FROM groups WHERE groups.id = enrollments.group_id)
+        AND (SELECT monthly_price FROM groups WHERE groups.id = enrollments.group_id) > 0;
+
+      -- 2. Update schema version
+      INSERT OR REPLACE INTO app_metadata(key, value, updated_at)
+        VALUES('schema_version', '12', datetime('now'));
+    `,
+  },
 ]
 
 // ─── Migration runner ─────────────────────────────────────────────────────────

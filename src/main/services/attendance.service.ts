@@ -19,7 +19,7 @@ export function getSessionDeductionPrice(
   if (sessionPrice !== null && sessionPrice !== undefined) {
     return Number(sessionPrice)
   }
-  const base = agreedPrice || monthlyPrice || 0
+  const base = (monthlyPrice && monthlyPrice > 0) ? monthlyPrice : (agreedPrice || 0)
   return Math.round((base / 4) * 100) / 100
 }
 
@@ -316,7 +316,7 @@ export async function markSessionAttended(
     enrollment.agreed_price,
     enrollment.monthly_price
   )
-  const baseMonthly = enrollment.agreed_price || enrollment.monthly_price || 0
+  const baseMonthly = (enrollment.monthly_price && enrollment.monthly_price > 0) ? enrollment.monthly_price : (enrollment.agreed_price || 0)
   const regularSessPrice = Math.round((baseMonthly / 4) * 100) / 100
 
   const { getEnrollmentBalance, deductSession, rechargeSessionCharge } = await import('./payment.service')
@@ -1342,7 +1342,7 @@ export async function getSessionWithRoster(sessionId: number): Promise<{
       s.agreed_price,
       s.monthly_price
     )
-    const baseMonthly = s.agreed_price || s.monthly_price || 0
+    const baseMonthly = (s.monthly_price && s.monthly_price > 0) ? s.monthly_price : (s.agreed_price || 0)
     const regularSessPrice = Math.round((baseMonthly / 4) * 100) / 100
     const remSessions = regularSessPrice > 0 ? Math.floor(bal.balance / regularSessPrice) : 0
 
