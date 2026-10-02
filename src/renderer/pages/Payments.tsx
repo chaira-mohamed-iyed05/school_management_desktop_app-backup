@@ -329,24 +329,12 @@ export default function Payments() {
       return
     }
 
-    const schoolTitle = schoolSettings?.schoolNameAr || 'مدرسة المعيار الثابت'
-    const coursesSummary = receiptModal.items && receiptModal.items.length > 0
-      ? receiptModal.items.map((it: any) => `${it.courseName || ''} (${it.groupName || ''}): ${Number(it.amount).toLocaleString()} DA`).join(' | ')
-      : [receiptModal.courseName, receiptModal.groupName].filter(Boolean).join(' ')
+    // Use student QR token for attendance scanning
+    const sid = receiptModal.studentId
+    const s = students.find((item) => item.id === sid || String(item.id) === String(sid))
+    const studentToken = receiptModal.qrToken || s?.qrToken || receiptModal.studentNumber || s?.studentNumber || String(sid)
 
-    const totalAmt = Number(receiptModal.totalAmount ?? receiptModal.amount) || 0
-
-    const qrLines = [
-      schoolTitle,
-      `Reçu: ${receiptModal.receiptNumber || ''}`,
-      receiptModal.studentName ? `Élève: ${receiptModal.studentName}` : null,
-      receiptModal.studentNumber ? `Matricule: ${receiptModal.studentNumber}` : null,
-      coursesSummary ? `Cours: ${coursesSummary}` : null,
-      `Montant: ${totalAmt.toLocaleString()} DA`,
-      `Date: ${receiptModal.paymentDate || ''}`,
-    ].filter(Boolean)
-
-    QRCode.toDataURL(qrLines.join('\n'), {
+    QRCode.toDataURL(studentToken, {
       width: 240,
       margin: 1,
       color: { dark: '#000000', light: '#FFFFFF' },
@@ -356,8 +344,6 @@ export default function Payments() {
       .catch((err) => console.error('Payment QR error:', err))
 
     // Find student to load photo if available
-    const sid = receiptModal.studentId
-    const s = students.find((item) => item.id === sid || String(item.id) === String(sid))
     if (s?.photoPath) {
       window.schoolApp.media.getImageUrl(s.photoPath)
         .then((res) => {
@@ -519,6 +505,7 @@ export default function Payments() {
           ...res.data,
           studentName: selectedStudent ? getStudentLabel(selectedStudent) : res.data?.studentName,
           studentNumber: selectedStudent?.studentNumber ?? res.data?.studentNumber,
+          qrToken: selectedStudent?.qrToken ?? res.data?.qrToken,
         }
         setReceiptModal(enrichedReceipt)
         await load()
@@ -1101,28 +1088,8 @@ export default function Payments() {
               <div style={{ borderBottom: '1px dashed #000000', margin: '1.2mm 0' }} />
             </div>
 
-            {/* Student Logo / Avatar Circle & Identity */}
+            {/* Student Identity */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5mm' }}>
-              <div style={{
-                width: '15mm',
-                height: '15mm',
-                borderRadius: '50%',
-                border: '1.5px solid #000000',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                marginBottom: '1mm',
-                backgroundColor: '#ffffff',
-              }}>
-                {receiptPhotoUrl ? (
-                  <img src={receiptPhotoUrl} alt="Photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: '9pt', fontWeight: 'bold', color: '#000000' }}>
-                    {modalStudentInitials}
-                  </span>
-                )}
-              </div>
               {receiptModal.studentName && (
                 <div style={{ fontSize: '10.5pt', fontWeight: 'bold', direction: 'rtl', color: '#000000', textAlign: 'center', lineHeight: '1.2' }}>
                   {receiptModal.studentName}
@@ -1130,7 +1097,7 @@ export default function Payments() {
               )}
               {receiptModal.studentNumber && (
                 <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'monospace', color: '#000000', marginTop: '0.3mm' }}>
-                  Matricule: {receiptModal.studentNumber}
+                  Matricule: #{receiptModal.studentNumber.replace(/^#/, '')}
                 </div>
               )}
             </div>
@@ -1139,7 +1106,7 @@ export default function Payments() {
 
             {/* Receipt Details */}
             <div style={{ fontSize: '7.5pt', lineHeight: '1.35', color: '#000000' }}>
-              {receiptModal.items && receiptModal.items.length > 0 ? (
+              {receiptModal.items && receiptModal.items.length > 1 ? (
                 <div>
                   <div style={{
                     fontWeight: 'bold',
@@ -1167,23 +1134,23 @@ export default function Payments() {
                   </div>
                 </div>
               ) : (
-                (receiptModal.courseName || receiptModal.groupName) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 'bold' }}>الفوج / المادة:</span>
-                    <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
-                      {receiptModal.courseName ? `${receiptModal.courseName} ` : ''}
-                      {receiptModal.groupName ? `(${receiptModal.groupName})` : ''}
-                    </span>
-                  </div>
-                )
+                (() => {
+                  const singleCourse = (receiptModal.items && receiptModal.items.length === 1)
+                    ? `${receiptModal.items[0].courseName ? receiptModal.items[0].courseName + ' ' : ''}${receiptModal.items[0].groupName ? '(' + receiptModal.items[0].groupName + ')' : ''}`.trim()
+                    : `${receiptModal.courseName ? receiptModal.courseName + ' ' : ''}${receiptModal.groupName ? '(' + receiptModal.groupName + ')' : ''}`.trim()
+                  return singleCourse ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 'bold' }}>الفوج / المادة:</span>
+                      <span style={{ direction: 'rtl', fontWeight: 'bold' }}>
+                        {singleCourse}
+                      </span>
+                    </div>
+                  ) : null
+                })()
               )}
 
               <div style={{ borderBottom: '1px dashed #000000', margin: '1mm 0' }} />
 
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 'bold' }}>فترة الفوترة:</span>
-                <span style={{ fontWeight: 'bold' }}>{receiptModal.billingPeriod}</span>
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 'bold' }}>طريقة الدفع:</span>
                 <span style={{ fontWeight: 'bold' }}>{t(`payments.${receiptModal.paymentMethod}`)}</span>
@@ -1223,8 +1190,8 @@ export default function Payments() {
                   QR Code
                 </div>
               )}
-              <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000000', fontFamily: 'monospace', textAlign: 'center' }}>
-                Reçu N°: {receiptModal.receiptNumber}
+              <div style={{ fontSize: '6.5pt', fontWeight: 'bold', color: '#000000', fontFamily: 'monospace', textAlign: 'center' }}>
+                {receiptModal.studentNumber ? `Matricule: #${receiptModal.studentNumber.replace(/^#/, '')}` : ''}
               </div>
             </div>
 

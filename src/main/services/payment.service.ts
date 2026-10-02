@@ -407,6 +407,7 @@ export async function topUpMultipleCredit(data: {
     studentName,
     studentNumber: student.student_number,
     photoPath: student.photo_path,
+    qrToken: student.qr_token || student.student_number,
   }
 }
 
@@ -418,6 +419,7 @@ export async function getPaymentReceiptDetails(paymentId: number): Promise<{
   studentName?: string
   studentNumber?: string
   photoPath?: string | null
+  qrToken?: string | null
   paymentDate: string
   paymentMethod: string
   billingPeriod: string
@@ -432,7 +434,7 @@ export async function getPaymentReceiptDetails(paymentId: number): Promise<{
 }> {
   const sqlite = getSqlite()
   const payment = sqlite.prepare(`
-    SELECT p.*, s.last_name_ar, s.first_name_ar, s.last_name_fr, s.first_name_fr, s.student_number, s.photo_path,
+    SELECT p.*, s.last_name_ar, s.first_name_ar, s.last_name_fr, s.first_name_fr, s.student_number, s.photo_path, s.qr_token,
            g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
     FROM payments p
     LEFT JOIN students s ON p.student_id = s.id
@@ -452,69 +454,15 @@ export async function getPaymentReceiptDetails(paymentId: number): Promise<{
     ? (payment.course_name_fr ? `${payment.course_name_ar} (${payment.course_name_fr})` : payment.course_name_ar)
     : (payment.course_name_fr || '')
 
-  // Check if this payment was part of a multi-course payment
-  let masterReceipt = payment.receipt_number
-  const match = (payment.notes || '').match(/\[reçu:([^\]]+)\]/)
-  if (match && match[1]) {
-    masterReceipt = match[1]
-  } else if (/-\d+$/.test(payment.receipt_number)) {
-    masterReceipt = payment.receipt_number.replace(/-\d+$/, '')
-  }
-
-  // Find all sibling payments sharing the same master receipt
-  const siblings = sqlite.prepare(`
-    SELECT p.*, g.name as group_name, c.name_ar as course_name_ar, c.name_fr as course_name_fr
-    FROM payments p
-    LEFT JOIN enrollments e ON p.enrollment_id = e.id
-    LEFT JOIN groups g ON e.group_id = g.id
-    LEFT JOIN courses c ON g.course_id = c.id
-    WHERE p.student_id = ?
-      AND (p.notes LIKE ? OR p.receipt_number LIKE ? OR p.id = ?)
-      AND p.status = 'paid'
-    ORDER BY p.id ASC
-  `).all(
-    payment.student_id,
-    `%[reçu:${masterReceipt}]%`,
-    `${masterReceipt}-%`,
-    payment.id
-  ) as any[]
-
-  if (siblings.length > 1) {
-    const items = siblings.map((sib) => {
-      const cName = sib.course_name_ar
-        ? (sib.course_name_fr ? `${sib.course_name_ar} (${sib.course_name_fr})` : sib.course_name_ar)
-        : (sib.course_name_fr || '')
-      return {
-        courseName: cName,
-        groupName: sib.group_name || '',
-        amount: Number(sib.amount) || 0,
-      }
-    })
-    const totalAmount = items.reduce((sum, it) => sum + it.amount, 0)
-
-    return {
-      receiptNumber: masterReceipt,
-      studentId: payment.student_id,
-      studentName,
-      studentNumber: payment.student_number,
-      photoPath: payment.photo_path,
-      paymentDate: payment.payment_date,
-      paymentMethod: payment.payment_method || 'cash',
-      billingPeriod: payment.billing_period,
-      reference: payment.reference,
-      totalAmount,
-      amount: totalAmount,
-      items,
-    }
-  }
-
-  // Single payment receipt
+  // Each payment row in the payments table represents a distinct payment transaction.
+  // We return its exact details so reprinting from the table row matches the record 100%.
   return {
     receiptNumber: payment.receipt_number,
     studentId: payment.student_id,
     studentName,
     studentNumber: payment.student_number,
     photoPath: payment.photo_path,
+    qrToken: payment.qr_token || payment.student_number,
     paymentDate: payment.payment_date,
     paymentMethod: payment.payment_method || 'cash',
     billingPeriod: payment.billing_period,

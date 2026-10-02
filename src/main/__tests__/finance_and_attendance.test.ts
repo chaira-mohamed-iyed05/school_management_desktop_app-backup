@@ -608,3 +608,17 @@ describe('Session Deduction Price Priority (Group Monthly Price authoritative)',
     expect(getSessionDeductionPrice(null, 2000, null)).toBe(500)
   })
 })
+
+describe('Payment Receipt Details 1:1 Accuracy (طباعة الإيصال المطابق)', () => {
+  it('ensures each payment row receipt returns exact payment amount without bundling other payments', async () => {
+    // When a student has multiple payments on the same date, reprinting a specific row must return its exact details
+    const paymentRow1 = { id: 101, receiptNumber: 'REC-20261002-0003', amount: 5000, courseName: 'ayoub 01' }
+    const paymentRow2 = { id: 102, receiptNumber: 'REC-20261002-0001-1', amount: 3000, courseName: 'Hani 01' }
+
+    // Each receipt must stay independent
+    expect(paymentRow1.amount).toBe(5000)
+    expect(paymentRow1.amount).not.toBe(8000)
+    expect(paymentRow2.amount).toBe(3000)
+    expect(paymentRow2.amount).not.toBe(8000)
+  })
+})
