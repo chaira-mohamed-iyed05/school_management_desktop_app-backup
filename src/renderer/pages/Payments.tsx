@@ -28,6 +28,17 @@ function normalizeNumberInput(val: string): string {
   return ascii.replace(/[^0-9.]/g, '')
 }
 
+function normalizeArabicText(str: string): string {
+  if (!str) return ''
+  return str
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[يى]/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '')
+    .trim()
+}
+
 // ── Searchable Student Combobox ─────────────────────────────────────────────
 function getStudentLabel(s: Student): string {
   const ar = `${s?.lastNameAr || ''} ${s?.firstNameAr || ''}`.trim()
@@ -301,7 +312,7 @@ export default function Payments() {
     setLoading(true)
     try {
       const [listRes, summaryRes, grpRes, crsRes, setRes, stuRes] = await Promise.all([
-        window.schoolApp.payments.list({ pageSize: 100 }),
+        window.schoolApp.payments.list({ pageSize: 10000 }),
         window.schoolApp.payments.summary(),
         window.schoolApp.groups.list(),
         window.schoolApp.courses.list(),
@@ -565,13 +576,15 @@ export default function Payments() {
 
   // ── Filter by search text ──
   const filtered = payments.filter((p) => {
-    if (!search) return true
-    const q = search.toLowerCase()
+    if (!search.trim()) return true
+    const q = normalizeArabicText(search)
     return (
-      (p.receiptNumber?.toLowerCase().includes(q)) ||
-      (p.studentName && p.studentName.toLowerCase().includes(q)) ||
-      (p.studentNumber && p.studentNumber.toLowerCase().includes(q)) ||
-      (p.groupName && p.groupName.toLowerCase().includes(q))
+      (p.receiptNumber && normalizeArabicText(p.receiptNumber).includes(q)) ||
+      (p.studentName && normalizeArabicText(p.studentName).includes(q)) ||
+      (p.studentNumber && normalizeArabicText(p.studentNumber).includes(q)) ||
+      (p.teacherName && normalizeArabicText(p.teacherName).includes(q)) ||
+      (p.groupName && normalizeArabicText(p.groupName).includes(q)) ||
+      (p.courseName && normalizeArabicText(p.courseName).includes(q))
     )
   })
 

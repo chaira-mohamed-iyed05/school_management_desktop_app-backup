@@ -67,8 +67,8 @@ export default function Reports() {
     setLoading(true)
     try {
       const [stRes, payRes, sessRes, setRes, grpRes, crsRes, tchRes] = await Promise.all([
-        window.schoolApp.students.list({ pageSize: 100, status: 'all' }),
-        window.schoolApp.payments.list({ pageSize: 100 }),
+        window.schoolApp.students.list({ pageSize: 1000, status: 'all' }),
+        window.schoolApp.payments.list({ pageSize: 10000 }),
         window.schoolApp.attendance.listSessions({ limit: 100 }),
         window.schoolApp.settings.get(),
         window.schoolApp.groups.list(),

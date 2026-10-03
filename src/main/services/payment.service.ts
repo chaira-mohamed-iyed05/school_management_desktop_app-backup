@@ -849,7 +849,7 @@ export async function listPayments(opts: {
 }): Promise<PaginatedResult<any>> {
   const sqlite = getSqlite()
   const page = Math.max(1, opts.page ?? 1)
-  const pageSize = Math.min(500, Math.max(1, opts.pageSize ?? 50))
+  const pageSize = Math.min(50000, Math.max(1, opts.pageSize ?? 50))
   const offset = (page - 1) * pageSize
 
   let where = "WHERE 1=1"

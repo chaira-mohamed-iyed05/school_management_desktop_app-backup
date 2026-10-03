@@ -14,10 +14,11 @@ export function registerPaymentHandlers(): void {
   handle(IPC_CHANNELS.PAYMENTS_LIST, async (payload) => {
     const opts = z.object({
       page: z.number().int().min(1).optional(),
-      pageSize: z.number().int().min(1).max(1000).optional(),
+      pageSize: z.number().int().min(1).max(50000).optional(),
       search: z.string().max(200).optional(),
       studentId: z.number().int().positive().optional(),
       type: z.string().optional(),
+      allTypes: z.boolean().optional(),
     }).parse(payload ?? {})
     return listPayments(opts)
   })
