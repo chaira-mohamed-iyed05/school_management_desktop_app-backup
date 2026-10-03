@@ -308,29 +308,74 @@ export default function Payments() {
     notes: '',
   })
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadPaymentsList = useCallback(async (targetPage = 1, searchQuery = '', append = false) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
+
     try {
-      const [listRes, summaryRes, grpRes, crsRes, setRes, stuRes] = await Promise.all([
-        window.schoolApp.payments.list({ pageSize: 10000 }),
+      const isSearching = searchQuery.trim().length > 0
+      const res = await window.schoolApp.payments.list({
+        page: targetPage,
+        pageSize: isSearching ? 500 : 50,
+        search: isSearching ? searchQuery.trim() : undefined,
+      })
+
+      if (res?.success && res.data) {
+        if (append) {
+          setPayments((prev) => [...prev, ...(res.data.items ?? [])])
+        } else {
+          setPayments(res.data.items ?? [])
+        }
+        setTotalCount(res.data.total ?? 0)
+        setPage(targetPage)
+      }
+    } catch (err) {
+      console.error('Failed to load payments:', err)
+    } finally {
+      if (append) setLoadingMore(false)
+      else setLoading(false)
+    }
+  }, [])
+
+  const load = useCallback(async () => {
+    try {
+      const [summaryRes, grpRes, crsRes, setRes, stuRes] = await Promise.all([
         window.schoolApp.payments.summary(),
         window.schoolApp.groups.list(),
         window.schoolApp.courses.list(),
         window.schoolApp.settings.get(),
         window.schoolApp.students.list({ pageSize: 1000 }),
       ])
-      if (listRes.success && listRes.data) setPayments(listRes.data.items)
-      if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data)
-      if (grpRes.success && grpRes.data) setGroups(grpRes.data)
-      if (crsRes.success && crsRes.data) setCourses(crsRes.data)
+      if (summaryRes?.success && summaryRes.data) setSummary(summaryRes.data)
+      if (grpRes?.success && grpRes.data) setGroups(grpRes.data)
+      if (crsRes?.success && crsRes.data) setCourses(crsRes.data)
       if (setRes?.success && setRes.data) setSchoolSettings(setRes.data)
       if (stuRes?.success && stuRes.data) setStudents(stuRes.data.items ?? [])
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      console.error('Failed to load metadata:', err)
     }
-  }, [])
+    await loadPaymentsList(1, search, false)
+  }, [loadPaymentsList, search])
 
   useEffect(() => { load() }, [load])
+
+  const handleSearchChange = (v: string) => {
+    setSearch(v)
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    searchTimeoutRef.current = setTimeout(() => {
+      loadPaymentsList(1, v, false)
+    }, 300)
+  }
+
+  const handleLoadMore = () => {
+    if (loadingMore || payments.length >= totalCount) return
+    loadPaymentsList(page + 1, search, true)
+  }
 
   // ── QR Code generation and photo loading for Payment Receipt Ticket ──
   useEffect(() => {
@@ -630,7 +675,7 @@ export default function Payments() {
             type="search"
             placeholder={t('common.search')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full ps-9 pe-3 py-2 border border-border rounded-lg text-sm bg-white focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
           />
         </div>
@@ -760,6 +805,31 @@ export default function Payments() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {/* Load More & Count Footer */}
+        {!loading && payments.length > 0 && (
+          <div className="p-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 bg-slate-50/50">
+            <div>
+              {lang === 'ar'
+                ? `عرض ${payments.length} من أصل ${totalCount} سجل`
+                : `Affichage de ${payments.length} sur ${totalCount} enregistrements`}
+            </div>
+            {payments.length < totalCount && (
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-4 py-1.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-100 hover:border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+              >
+                {loadingMore ? (
+                  <div className="w-3.5 h-3.5 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ChevronDown size={14} />
+                )}
+                <span>{lang === 'ar' ? 'عرض المزيد (+50 دفعة)' : 'Afficher plus (+50)'}</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
 

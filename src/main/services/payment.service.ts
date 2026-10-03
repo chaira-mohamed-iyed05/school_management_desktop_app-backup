@@ -861,11 +861,19 @@ export async function listPayments(opts: {
   }
 
   if (opts.search && opts.search.trim()) {
-    const q = `%${opts.search.trim()}%`
+    const raw = opts.search.trim()
+    const q1 = `%${raw}%`
+    const q2 = `%${raw.replace(/ي/g, 'ى').replace(/ه/g, 'ة')}%`
+    const q3 = `%${raw.replace(/ى/g, 'ي').replace(/ة/g, 'ه')}%`
+    const q4 = `%${raw.replace(/[أإآ]/g, 'ا')}%`
+    const q5 = `%${raw.replace(/ا/g, 'أ')}%`
+
     where += ` AND (
       p.receipt_number LIKE ?
-      OR s.last_name_ar LIKE ?
-      OR s.first_name_ar LIKE ?
+      OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ?
+      OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ?
+      OR (s.last_name_ar || ' ' || s.first_name_ar) LIKE ? OR (s.last_name_ar || ' ' || s.first_name_ar) LIKE ?
+      OR (s.first_name_ar || ' ' || s.last_name_ar) LIKE ? OR (s.first_name_ar || ' ' || s.last_name_ar) LIKE ?
       OR s.last_name_fr LIKE ?
       OR s.first_name_fr LIKE ?
       OR s.student_number LIKE ?
@@ -878,7 +886,14 @@ export async function listPayments(opts: {
       OR p.notes LIKE ?
       OR p.billing_period LIKE ?
     )`
-    params.push(q, q, q, q, q, q, q, q, q, q, q, q, q, q)
+    params.push(
+      q1,
+      q1, q2, q3, q4, q5,
+      q1, q2, q3, q4, q5,
+      q1, q2,
+      q1, q2,
+      q1, q1, q1, q1, q1, q1, q1, q1, q1, q1, q1
+    )
   }
 
   if (opts.type && opts.type !== 'all') {
