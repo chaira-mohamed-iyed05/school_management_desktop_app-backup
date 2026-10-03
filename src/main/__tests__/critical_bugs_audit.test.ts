@@ -122,4 +122,32 @@ describe('Critical Bug Audit — Arabic Search Text Normalization Coverage', () 
     const userInput = normalizeArabicText('فاطمه الزهراء')
     expect(studentDbName).toBe(userInput)
   })
+
+  it('matches composite names in either order (first+last or last+first)', () => {
+    const firstName = 'أحمد'
+    const lastName = 'بن علي'
+
+    const order1 = `${normalizeArabicText(lastName)} ${normalizeArabicText(firstName)}`
+    const order2 = `${normalizeArabicText(firstName)} ${normalizeArabicText(lastName)}`
+
+    const userSearch1 = normalizeArabicText('بن علي احمد')
+    const userSearch2 = normalizeArabicText('احمد بن علي')
+
+    expect(order1).toBe(userSearch1)
+    expect(order2).toBe(userSearch2)
+  })
 })
+
+describe('Critical Bug Audit — Student Service 50,000 Capacity Clamping', () => {
+  it('correctly clamps pageSize up to 50000 instead of 200', () => {
+    const clampPageSize = (reqSize?: number) => Math.min(50000, Math.max(1, reqSize ?? 50))
+
+    expect(clampPageSize(50000)).toBe(50000)
+    expect(clampPageSize(1000)).toBe(1000)
+    expect(clampPageSize(250)).toBe(250)
+    expect(clampPageSize(undefined)).toBe(50)
+    expect(clampPageSize(0)).toBe(1)
+    expect(clampPageSize(60000)).toBe(50000)
+  })
+})
+

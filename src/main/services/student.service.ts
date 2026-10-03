@@ -65,7 +65,7 @@ export async function listStudents(opts: {
 }): Promise<PaginatedResult<Student>> {
   const sqlite = getSqlite()
   const page = Math.max(1, opts.page ?? 1)
-  const pageSize = Math.min(200, Math.max(1, opts.pageSize ?? 50))
+  const pageSize = Math.min(50000, Math.max(1, opts.pageSize ?? 50))
   const offset = (page - 1) * pageSize
 
   let whereClauses: string[] = []
@@ -92,11 +92,36 @@ export async function listStudents(opts: {
     params.push(opts.courseId)
   }
 
-  // Search query
+  // Search query with Arabic letter normalization and composite name matching
   if (opts.search && opts.search.trim()) {
-    const q = `%${opts.search.trim()}%`
-    whereClauses.push("(s.first_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.first_name_fr LIKE ? OR s.last_name_fr LIKE ? OR s.student_number LIKE ? OR s.phone LIKE ? OR s.qr_token LIKE ?)")
-    params.push(q, q, q, q, q, q, q)
+    const raw = opts.search.trim()
+    const q1 = `%${raw}%`
+    const q2 = `%${raw.replace(/ي/g, 'ى').replace(/ه/g, 'ة')}%`
+    const q3 = `%${raw.replace(/ى/g, 'ي').replace(/ة/g, 'ه')}%`
+    const q4 = `%${raw.replace(/[أإآ]/g, 'ا')}%`
+    const q5 = `%${raw.replace(/ا/g, 'أ')}%`
+
+    whereClauses.push(`(
+      s.student_number LIKE ?
+      OR s.phone LIKE ?
+      OR s.qr_token LIKE ?
+      OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ? OR s.last_name_ar LIKE ?
+      OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ? OR s.first_name_ar LIKE ?
+      OR (s.last_name_ar || ' ' || s.first_name_ar) LIKE ? OR (s.last_name_ar || ' ' || s.first_name_ar) LIKE ?
+      OR (s.first_name_ar || ' ' || s.last_name_ar) LIKE ? OR (s.first_name_ar || ' ' || s.last_name_ar) LIKE ?
+      OR s.last_name_fr LIKE ?
+      OR s.first_name_fr LIKE ?
+      OR (s.last_name_fr || ' ' || s.first_name_fr) LIKE ?
+      OR (s.first_name_fr || ' ' || s.last_name_fr) LIKE ?
+    )`)
+    params.push(
+      q1, q1, q1,
+      q1, q2, q3, q4, q5,
+      q1, q2, q3, q4, q5,
+      q1, q2,
+      q1, q2,
+      q1, q1, q1, q1
+    )
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
