@@ -349,7 +349,7 @@ export default function Payments() {
         window.schoolApp.groups.list(),
         window.schoolApp.courses.list(),
         window.schoolApp.settings.get(),
-        window.schoolApp.students.list({ pageSize: 1000 }),
+        window.schoolApp.students.list({ pageSize: 50000, status: 'all' }),
       ])
       if (summaryRes?.success && summaryRes.data) setSummary(summaryRes.data)
       if (grpRes?.success && grpRes.data) setGroups(grpRes.data)

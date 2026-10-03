@@ -133,7 +133,7 @@ export function registerPaymentHandlers(): void {
   handle('payments:listAll', async (payload) => {
     const opts = z.object({
       page: z.number().int().min(1).optional(),
-      pageSize: z.number().int().min(1).max(2000).optional(),
+      pageSize: z.number().int().min(1).max(50000).optional(),
       studentId: z.number().int().positive().optional(),
     }).parse(payload ?? {})
     return listPayments({ ...opts, allTypes: true })

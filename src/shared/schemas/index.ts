@@ -60,7 +60,7 @@ export const StudentIdSchema = z.object({
 
 export const StudentListSchema = z.object({
   page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(1000).default(100),
+  pageSize: z.number().int().min(1).max(50000).default(100),
   search: z.string().max(200).trim().optional(),
   status: z.enum(['active', 'inactive', 'archived', 'all', 'paid', 'in_debt']).default('all'),
   courseId: z.number().int().positive().optional(),

@@ -144,35 +144,44 @@ export async function archiveTeacher(id: number): Promise<void> {
  * Must be executed within a transaction.
  */
 function cascadeDeleteGroupInternal(sqlite: any, groupId: number): void {
-  // 1. Delete all payments associated with this group (either via its enrollments or via its sessions)
+  // 1. Preserve financial audit trail: Unlink any real customer payments/refunds so the financial ledger remains intact
+  sqlite.prepare(`
+    UPDATE payments
+    SET enrollment_id = NULL, session_id = NULL, notes = COALESCE(notes || ' | ', '') || 'Archived on group deletion'
+    WHERE (enrollment_id IN (SELECT id FROM enrollments WHERE group_id = ?)
+       OR session_id IN (SELECT id FROM attendance_sessions WHERE group_id = ?))
+      AND payment_type IN ('credit', 'payment', 'transfer_in', 'credit_transfer_in', 'transfer_out', 'credit_transfer_out', 'refund', 'enrollment_refund', 'teacher_payout')
+  `).run(groupId, groupId)
+
+  // 2. Delete internal session deduction records associated with this group's sessions/enrollments
   sqlite.prepare(`
     DELETE FROM payments 
     WHERE enrollment_id IN (SELECT id FROM enrollments WHERE group_id = ?)
        OR session_id IN (SELECT id FROM attendance_sessions WHERE group_id = ?)
   `).run(groupId, groupId)
 
-  // 2. Delete all attendance records associated with sessions in this group
+  // 3. Delete all attendance records associated with sessions in this group
   sqlite.prepare(`
     DELETE FROM attendance_records 
     WHERE session_id IN (SELECT id FROM attendance_sessions WHERE group_id = ?)
   `).run(groupId)
 
-  // 3. Delete all attendance sessions for this group
+  // 4. Delete all attendance sessions for this group
   sqlite.prepare(`
     DELETE FROM attendance_sessions WHERE group_id = ?
   `).run(groupId)
 
-  // 4. Delete all group schedule slots for this group
+  // 5. Delete all group schedule slots for this group
   sqlite.prepare(`
     DELETE FROM group_schedule_slots WHERE group_id = ?
   `).run(groupId)
 
-  // 5. Delete all enrollments for this group
+  // 6. Delete all enrollments for this group
   sqlite.prepare(`
     DELETE FROM enrollments WHERE group_id = ?
   `).run(groupId)
 
-  // 6. Delete the group itself
+  // 7. Delete the group itself
   sqlite.prepare(`
     DELETE FROM groups WHERE id = ?
   `).run(groupId)

@@ -296,6 +296,16 @@ export function registerSessionsHandlers(): void {
 
     try {
       return sqlite.transaction(() => {
+        // Prevent cancelling if session is already paid out to teacher
+        const existingSession = sqlite.prepare(`SELECT teacher_payout_id FROM attendance_sessions WHERE id = ?`).get(sessionId) as any
+        if (existingSession?.teacher_payout_id) {
+          throw new Error('لا يمكن إلغاء حصة تم تسوية مستحقات الأستاذ عنها / Cannot cancel a session included in a teacher payout.')
+        }
+        const inPayout = sqlite.prepare(`SELECT 1 FROM teacher_payout_items WHERE session_id = ? LIMIT 1`).get(sessionId)
+        if (inPayout) {
+          throw new Error('لا يمكن إلغاء حصة مرتبطة بمستحقات أستاذ / Cannot cancel a session linked to a teacher payout.')
+        }
+
         // Revert financial deductions for this session (both 'session_charge' and 'deduction', plus any session refund)
         sqlite.prepare(`
           DELETE FROM payments
@@ -347,6 +357,16 @@ export function registerSessionsHandlers(): void {
 
     try {
       return sqlite.transaction(() => {
+        // Prevent deleting if session is already paid out to teacher
+        const existingSession = sqlite.prepare(`SELECT teacher_payout_id FROM attendance_sessions WHERE id = ?`).get(sessionId) as any
+        if (existingSession?.teacher_payout_id) {
+          throw new Error('لا يمكن حذف حصة تم تسوية مستحقات الأستاذ عنها / Cannot delete a session included in a teacher payout.')
+        }
+        const inPayout = sqlite.prepare(`SELECT 1 FROM teacher_payout_items WHERE session_id = ? LIMIT 1`).get(sessionId)
+        if (inPayout) {
+          throw new Error('لا يمكن حذف حصة مرتبطة بمستحقات أستاذ / Cannot delete a session linked to a teacher payout.')
+        }
+
         // Revert financial deductions for this session
         sqlite.prepare(`
           DELETE FROM payments

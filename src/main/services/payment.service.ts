@@ -24,11 +24,13 @@ async function generateReceiptNumber(): Promise<string> {
 
   let maxSeq = 0
   for (const r of rows) {
-    const parts = r.receipt_number.split('-')
-    const lastPart = parts[parts.length - 1]
-    const seq = parseInt(lastPart, 10)
-    if (!isNaN(seq) && seq > maxSeq) {
-      maxSeq = seq
+    // Receipts can be formatted as PREFIX-YYYYMMDD-XXXX or multi-item PREFIX-YYYYMMDD-XXXX-N
+    const match = r.receipt_number.match(/-\d{8}-(\d+)(?:-\d+)?$/)
+    if (match) {
+      const seq = parseInt(match[1], 10)
+      if (!isNaN(seq) && seq > maxSeq) {
+        maxSeq = seq
+      }
     }
   }
 
@@ -36,8 +38,10 @@ async function generateReceiptNumber(): Promise<string> {
   while (true) {
     const candidate = `${prefix}-${ts}-${String(nextSeq).padStart(4, '0')}`
     const exists = sqlite.prepare(`
-      SELECT 1 FROM payments WHERE receipt_number = ? LIMIT 1
-    `).get(candidate)
+      SELECT 1 FROM payments 
+      WHERE receipt_number = ? OR receipt_number LIKE ? 
+      LIMIT 1
+    `).get(candidate, `${candidate}-%`)
     if (!exists) {
       return candidate
     }
@@ -269,6 +273,7 @@ export async function topUpMultipleCredit(data: {
   studentName?: string
   studentNumber?: string
   photoPath?: string | null
+  qrToken?: string | null
 }> {
   const session = requireSession()
   const db = getDb()
@@ -659,8 +664,8 @@ export async function transferBalance(data: {
 
     const now = new Date().toISOString()
     const nowDate = now.slice(0, 10)
-    const receiptOut = `TR-OUT-${Date.now()}`
-    const receiptIn = `TR-IN-${Date.now()}`
+    const receiptOut = `TR-OUT-${Date.now()}-${data.fromEnrollmentId}`
+    const receiptIn = `TR-IN-${Date.now()}-${data.toEnrollmentId}`
 
     if (transferAmount > 0) {
       sqlite.prepare(`
@@ -756,7 +761,7 @@ export async function cancelEnrollment(data: {
     const nowDate = now.slice(0, 10)
 
     if (refundAmount > 0) {
-      const receiptNumber = `REF-${Date.now()}`
+      const receiptNumber = `REF-${Date.now()}-${data.enrollmentId}`
       sqlite.prepare(`
         INSERT INTO payments (receipt_number, student_id, enrollment_id, billing_period, amount,
           payment_type, payment_method, payment_date, notes, received_by, status, created_at, updated_at)
@@ -900,7 +905,7 @@ export async function listPayments(opts: {
     where += " AND p.payment_type = ?"
     params.push(opts.type)
   } else if (!opts.allTypes && opts.type !== 'all') {
-    where += " AND p.payment_type IN ('credit', 'teacher_payout')" // Default: show top-ups and teacher payouts in main list
+    where += " AND p.payment_type IN ('credit', 'payment', 'teacher_payout', 'refund')" // Default: show top-ups, payments, teacher payouts and refunds in main list
   }
 
   const rows = sqlite.prepare(`
