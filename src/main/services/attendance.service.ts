@@ -1533,7 +1533,7 @@ export async function reconcilePastSessionsAttendance(): Promise<{ reconciledCou
         sqlite.prepare(`
           INSERT INTO attendance_records
             (session_id, student_id, attendance_status, is_inactive, source, was_enrolled, created_by, created_at, updated_at)
-          VALUES (?, ?, 'absent', 0, 'reconciliation', 1, 1, datetime('now'), datetime('now'))
+          VALUES (?, ?, 'absent', 0, 'manual', 1, 1, datetime('now'), datetime('now'))
         `).run(sess.id, en.student_id)
         reconciledCount++
 
@@ -1678,7 +1678,7 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
 
   const sessionIds = sessions.map(s => s.id)
 
-  // 3. Fetch Enrolled Students for this group
+  // 3. Fetch Enrolled Students for this group (active, or inactive who have past attendance)
   const enrolledStudents = sqlite.prepare(`
     SELECT st.id as student_id, st.student_number, st.first_name_ar, st.last_name_ar,
            st.first_name_fr, st.last_name_fr, st.phone, st.status as student_status,
@@ -1687,8 +1687,16 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
     FROM enrollments e
     JOIN students st ON e.student_id = st.id
     WHERE e.group_id = ?
+      AND (
+        e.status = 'active'
+        OR EXISTS (
+          SELECT 1 FROM attendance_records ar
+          JOIN attendance_sessions s ON ar.session_id = s.id
+          WHERE s.group_id = ? AND ar.student_id = st.id
+        )
+      )
     ORDER BY st.last_name_ar ASC, st.first_name_ar ASC
-  `).all(groupId) as any[]
+  `).all(groupId, groupId) as any[]
 
   const enrollmentIds = enrolledStudents.map(s => s.enrollment_id)
 
@@ -1776,14 +1784,9 @@ export async function getGroupSessionsReport(groupId: number): Promise<{
         } else {
           status = wasEnrolledBefore && !wasCancelledBeforeSession ? 'absent' : 'not_enrolled_yet'
         }
-      } else if (wasCancelledBeforeSession) {
-        status = 'not_enrolled_yet'
       } else {
-        if (wasEnrolledBefore) {
-          status = 'absent'
-        } else {
-          status = 'not_enrolled_yet'
-        }
+        // In conducted/closed sessions: missing attendance record means student was not enrolled/present
+        status = 'not_enrolled_yet'
       }
 
       // Determine deduction amount for this session

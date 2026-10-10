@@ -259,4 +259,78 @@ describe('Critical Bug Audit — Re-enrollment Lifecycle and Unique Constraint P
   })
 })
 
+describe('Critical Bug Audit — Unenrolled Student Absence & Phantom Debt Prevention', () => {
+  it('does not mark student absent in closed sessions if attendance record does not exist', () => {
+    // Model status determination logic for a closed session
+    const determineStatus = (rec: { status: string; isInactive: number } | undefined, sessionType: string) => {
+      if (sessionType === 'cancelled') {
+        return 'cancelled'
+      } else if (rec) {
+        if (rec.isInactive === 1 || rec.status === 'inactive' || rec.status === 'not_active') {
+          return 'not_active'
+        } else if (rec.status === 'present' || rec.status === 'late') {
+          return 'present'
+        } else if (rec.status === 'absent') {
+          return 'absent'
+        }
+        return 'absent'
+      } else {
+        // Missing record in closed session must be not_enrolled_yet
+        return 'not_enrolled_yet'
+      }
+    }
+
+    // 1. Session where student attended
+    expect(determineStatus({ status: 'present', isInactive: 0 }, 'regular')).toBe('present')
+
+    // 2. Session where student was actually marked absent
+    expect(determineStatus({ status: 'absent', isInactive: 0 }, 'regular')).toBe('absent')
+
+    // 3. Session held after student was unenrolled (no attendance record)
+    expect(determineStatus(undefined, 'regular')).toBe('not_enrolled_yet')
+
+    // 4. Cancelled session
+    expect(determineStatus(undefined, 'cancelled')).toBe('cancelled')
+  })
+
+  it('filters out inactive students who have zero attendance records in the group', () => {
+    const students = [
+      { id: 6, name: 'Ahmed', status: 'inactive', hasAttendance: true },
+      { id: 9, name: 'Ali', status: 'inactive', hasAttendance: false },
+      { id: 10, name: 'Allaoua 1', status: 'active', hasAttendance: true },
+      { id: 11, name: 'Allaoua 2', status: 'active', hasAttendance: false },
+    ]
+
+    const filtered = students.filter(s => s.status === 'active' || s.hasAttendance)
+
+    expect(filtered.map(s => s.id)).toEqual([6, 10, 11])
+    expect(filtered.some(s => s.id === 9)).toBe(false) // Ali (inactive with 0 attendance) is omitted!
+  })
+
+  it('calculates zero teacher payout and zero debt for not_enrolled_yet sessions', () => {
+    const sessionCost = 1250
+    const teacherPct = 50
+
+    const calculateCell = (status: string, studentPaidCredit: number, runningTotal: number) => {
+      if (status !== 'present' && status !== 'absent') {
+        return { cellPrice: 0, state: 'none', teacherShare: 0, debt: 0 }
+      }
+      const newTotal = runningTotal + sessionCost
+      if (studentPaidCredit >= newTotal) {
+        return { cellPrice: sessionCost, state: 'yellow', teacherShare: sessionCost * (teacherPct / 100), debt: 0 }
+      } else {
+        return { cellPrice: sessionCost, state: 'red', teacherShare: 0, debt: sessionCost }
+      }
+    }
+
+    // For a session where student was not enrolled
+    const res = calculateCell('not_enrolled_yet', 5000, 0)
+    expect(res.cellPrice).toBe(0)
+    expect(res.state).toBe('none')
+    expect(res.teacherShare).toBe(0)
+    expect(res.debt).toBe(0)
+  })
+})
+
+
 

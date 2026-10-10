@@ -77,7 +77,7 @@ export async function getTeacherPayoutMatrix(groupId: number): Promise<TeacherPa
 
   const sessionIds = sessionRows.map((s) => s.id)
 
-  // 3. Fetch Enrolled Students for this group (including inactive / archived)
+  // 3. Fetch Enrolled Students for this group (active, or inactive who have past attendance)
   const enrolledStudents = sqlite.prepare(`
     SELECT st.id as student_id, st.student_number, st.first_name_ar, st.last_name_ar,
            st.first_name_fr, st.last_name_fr, st.phone, st.status as student_status,
@@ -86,8 +86,16 @@ export async function getTeacherPayoutMatrix(groupId: number): Promise<TeacherPa
     FROM enrollments e
     JOIN students st ON e.student_id = st.id
     WHERE e.group_id = ?
+      AND (
+        e.status = 'active'
+        OR EXISTS (
+          SELECT 1 FROM attendance_records ar
+          JOIN attendance_sessions s ON ar.session_id = s.id
+          WHERE s.group_id = ? AND ar.student_id = st.id
+        )
+      )
     ORDER BY st.last_name_ar ASC, st.first_name_ar ASC
-  `).all(groupId) as any[]
+  `).all(groupId, groupId) as any[]
 
   const enrollmentIds = enrolledStudents.map((s) => s.enrollment_id)
 
@@ -214,10 +222,9 @@ export async function getTeacherPayoutMatrix(groupId: number): Promise<TeacherPa
         } else {
           status = isEnrolledBefore && !wasCancelledBeforeSession ? 'absent' : 'not_enrolled_yet'
         }
-      } else if (wasCancelledBeforeSession || !isEnrolledBefore) {
-        status = 'not_enrolled_yet'
       } else {
-        status = 'absent'
+        // In conducted/closed sessions: if no attendance record exists, student was not in this session
+        status = 'not_enrolled_yet'
       }
 
       // Determine session price for this student
