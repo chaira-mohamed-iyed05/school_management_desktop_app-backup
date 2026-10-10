@@ -2,7 +2,7 @@ import { eq, desc, and, like, count, sql } from 'drizzle-orm'
 import { getDb, getSqlite, schema } from '../database/connection'
 import { AppError, ErrorCode } from '../../shared/errors/index'
 import { DEFAULT_RECEIPT_PREFIX } from '../../shared/constants/index'
-import { requireSession } from './auth.service'
+import { requireSession, getCurrentSession } from './auth.service'
 import type { Payment, PaginatedResult } from '../../shared/types/index'
 import log from 'electron-log'
 
@@ -501,7 +501,8 @@ export async function deductSession(data: {
   sessionDate: string
   sessionPrice: number
 }): Promise<{ deducted: boolean; newBalance: number; wasInDebt: boolean }> {
-  const session = requireSession()
+  const session = getCurrentSession()
+  const adminId = session?.adminId ?? 1
   const sqlite = getSqlite()
 
   // Idempotency: don't deduct twice for same session+enrollment
@@ -535,7 +536,7 @@ export async function deductSession(data: {
     data.sessionDate.slice(0, 7), data.sessionPrice,
     data.sessionId, data.sessionDate,
     wasInDebt ? 'DEBT: insufficient credit' : null,
-    session.adminId
+    adminId
   )
 
   const newBal = await getEnrollmentBalance(data.enrollmentId)
