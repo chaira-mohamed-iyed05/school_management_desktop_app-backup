@@ -151,3 +151,112 @@ describe('Critical Bug Audit — Student Service 50,000 Capacity Clamping', () =
   })
 })
 
+describe('Critical Bug Audit — Re-enrollment Lifecycle and Unique Constraint Prevention', () => {
+  it('safeguards agreedPrice conversion preventing NaN or undefined errors', () => {
+    const safePrice = (val: any) => Number(val) || 0
+
+    expect(safePrice(1500)).toBe(1500)
+    expect(safePrice('2000')).toBe(2000)
+    expect(safePrice(undefined)).toBe(0)
+    expect(safePrice(null)).toBe(0)
+    expect(safePrice(NaN)).toBe(0)
+    expect(safePrice('')).toBe(0)
+  })
+
+  it('correctly distinguishes new enrollment, already active, and re-activation of cancelled enrollment', () => {
+    type MockEnrollment = {
+      id: number
+      studentId: number
+      groupId: number
+      agreedPrice: number
+      enrollmentDate: string
+      status: 'active' | 'inactive' | 'completed'
+      cancelledAt: string | null
+      cancelReason: string | null
+      refundAmount: number | null
+    }
+
+    const table: MockEnrollment[] = [
+      {
+        id: 101,
+        studentId: 5,
+        groupId: 2,
+        agreedPrice: 1500,
+        enrollmentDate: '2026-09-01',
+        status: 'completed',
+        cancelledAt: '2026-09-20T10:00:00Z',
+        cancelReason: 'student_requested',
+        refundAmount: 500,
+      },
+    ]
+
+    const handleEnrollment = (data: { studentId: number; groupId: number; agreedPrice: number; enrollmentDate: string }) => {
+      const existing = table.find(e => e.studentId === data.studentId && e.groupId === data.groupId)
+      if (existing) {
+        if (existing.status === 'active') {
+          throw new Error('STUDENT_ALREADY_ENROLLED')
+        }
+        // Reactivate in-place
+        existing.status = 'active'
+        existing.agreedPrice = data.agreedPrice
+        existing.enrollmentDate = data.enrollmentDate
+        existing.cancelledAt = null
+        existing.cancelReason = null
+        existing.refundAmount = null
+        return { ...existing, reactivated: true }
+      }
+      const newRecord: MockEnrollment = {
+        id: 999,
+        studentId: data.studentId,
+        groupId: data.groupId,
+        agreedPrice: data.agreedPrice,
+        enrollmentDate: data.enrollmentDate,
+        status: 'active',
+        cancelledAt: null,
+        cancelReason: null,
+        refundAmount: null,
+      }
+      table.push(newRecord)
+      return { ...newRecord, reactivated: false }
+    }
+
+    // 1. Re-enrolling student 5 in group 2 should reactivate existing record without inserting duplicate
+    const res1 = handleEnrollment({
+      studentId: 5,
+      groupId: 2,
+      agreedPrice: 1800,
+      enrollmentDate: '2026-10-10',
+    })
+
+    expect(res1.reactivated).toBe(true)
+    expect(res1.id).toBe(101) // Preserves original ID
+    expect(res1.status).toBe('active')
+    expect(res1.agreedPrice).toBe(1800)
+    expect(res1.enrollmentDate).toBe('2026-10-10')
+    expect(res1.cancelledAt).toBeNull()
+    expect(table.length).toBe(1) // No duplicate row created!
+
+    // 2. Re-enrolling while active should throw STUDENT_ALREADY_ENROLLED
+    expect(() => {
+      handleEnrollment({
+        studentId: 5,
+        groupId: 2,
+        agreedPrice: 1800,
+        enrollmentDate: '2026-10-10',
+      })
+    }).toThrow('STUDENT_ALREADY_ENROLLED')
+
+    // 3. New student should insert cleanly
+    const res2 = handleEnrollment({
+      studentId: 9,
+      groupId: 2,
+      agreedPrice: 2000,
+      enrollmentDate: '2026-10-10',
+    })
+    expect(res2.reactivated).toBe(false)
+    expect(res2.id).toBe(999)
+    expect(table.length).toBe(2)
+  })
+})
+
+

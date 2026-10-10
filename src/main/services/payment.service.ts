@@ -316,10 +316,19 @@ export async function topUpMultipleCredit(data: {
     // If newGroupId specified without existing enrollmentId, create enrollment
     if (!finalEnrollmentId && item.newGroupId) {
       const existingEnr = sqlite.prepare(`
-        SELECT id FROM enrollments WHERE student_id = ? AND group_id = ? AND status = 'active'
+        SELECT id, status FROM enrollments WHERE student_id = ? AND group_id = ?
       `).get(data.studentId, item.newGroupId) as any
 
       if (existingEnr) {
+        if (existingEnr.status !== 'active') {
+          const grp = sqlite.prepare(`SELECT monthly_price FROM groups WHERE id = ?`).get(item.newGroupId) as any
+          const groupMonthlyPrice = (grp?.monthly_price && Number(grp.monthly_price) > 0) ? Number(grp.monthly_price) : item.amount
+          sqlite.prepare(`
+            UPDATE enrollments
+            SET status = 'active', agreed_price = ?, enrollment_date = ?, cancelled_at = NULL, cancel_reason = NULL, refund_amount = NULL, updated_at = datetime('now')
+            WHERE id = ?
+          `).run(groupMonthlyPrice, data.paymentDate, existingEnr.id)
+        }
         finalEnrollmentId = existingEnr.id
       } else {
         const grp = sqlite.prepare(`SELECT monthly_price FROM groups WHERE id = ?`).get(item.newGroupId) as any

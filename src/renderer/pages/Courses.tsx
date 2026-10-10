@@ -341,7 +341,7 @@ export default function Courses() {
       const res = await window.schoolApp.enrollments.create({
         studentId,
         groupId: selectedGroup.id,
-        agreedPrice: selectedGroup.monthlyPrice,
+        agreedPrice: Number(selectedGroup.monthlyPrice) || 0,
         enrollmentDate: new Date().toISOString().slice(0, 10),
       })
       if (res.success) {
@@ -354,7 +354,10 @@ export default function Courses() {
           await loadGroupStudents(viewGroupStudents.id)
         }
       } else {
-        alert(res.error ?? (lang === 'ar' ? 'فشل التسجيل (قد يكون مسجلاً بالفعل)' : 'Échec de l\'inscription'))
+        const errorMsg = res.code === 'STUDENT_ALREADY_ENROLLED'
+          ? (lang === 'ar' ? 'هذا الطالب مسجل بالفعل في هذا الفوج' : 'Cet étudiant est déjà inscrit dans ce groupe')
+          : (res.error ?? (lang === 'ar' ? 'فشل التسجيل' : 'Échec de l\'inscription'))
+        alert(errorMsg)
       }
     } finally {
       setEnrolling(false)

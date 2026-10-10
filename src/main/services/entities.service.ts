@@ -362,12 +362,41 @@ export async function createEnrollment(data: { studentId: number; groupId: numbe
   requireSession()
   const db = getDb()
 
-  // Check not already enrolled
+  // Check if student already has an enrollment record for this group
   const existing = await db.query.enrollments.findFirst({
     where: and(eq(schema.enrollments.studentId, data.studentId), eq(schema.enrollments.groupId, data.groupId)),
   })
-  if (existing && existing.status === 'active') {
-    throw new AppError(ErrorCode.STUDENT_ALREADY_ENROLLED, 'Student is already enrolled in this group')
+
+  if (existing) {
+    if (existing.status === 'active') {
+      throw new AppError(ErrorCode.STUDENT_ALREADY_ENROLLED, 'Student is already enrolled in this group')
+    }
+
+    // Reactivate existing enrollment (previously cancelled or inactive) in-place
+    const [reactivated] = await db.update(schema.enrollments)
+      .set({
+        status: 'active',
+        agreedPrice: data.agreedPrice,
+        enrollmentDate: data.enrollmentDate,
+        cancelledAt: null,
+        cancelReason: null,
+        refundAmount: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(schema.enrollments.id, existing.id))
+      .returning()
+
+    const r = reactivated!
+    return {
+      id: r.id,
+      studentId: r.studentId,
+      groupId: r.groupId,
+      agreedPrice: r.agreedPrice,
+      enrollmentDate: r.enrollmentDate,
+      status: r.status as Enrollment['status'],
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }
   }
 
   const result = await db.insert(schema.enrollments).values({ ...data, updatedAt: new Date().toISOString() }).returning()
