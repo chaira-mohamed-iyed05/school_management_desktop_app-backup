@@ -307,13 +307,13 @@ export default function TeacherPayouts() {
           <button
             type="button"
             onClick={() => setActiveTab('matrix')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'matrix'
                 ? 'bg-white text-purple-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Sparkles size={14} /> {lang === 'ar' ? 'مصفوفة الحصص والصرف' : 'Grille & Paiement'}
+            {lang === 'ar' ? 'مصفوفة الحصص والصرف' : 'Grille & Paiement'}
           </button>
           <button
             type="button"
@@ -472,9 +472,8 @@ export default function TeacherPayouts() {
                 <button
                   type="button"
                   onClick={handleCollectAllYellows}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white font-bold text-xs rounded-xl hover:bg-amber-600 transition-all shadow-xs cursor-pointer"
+                  className="px-3 py-2 bg-amber-500 text-white font-bold text-xs rounded-xl hover:bg-amber-600 transition-all shadow-xs cursor-pointer"
                 >
-                  <Sparkles size={14} />
                   <span>{t('teacherPayouts.collectYellows')}</span>
                 </button>
                 <button

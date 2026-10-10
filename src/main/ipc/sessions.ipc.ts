@@ -573,6 +573,9 @@ export function registerSessionsHandlers(): void {
 
       sql += ` LIMIT ${Math.min(opts.limit || 50, 100)}`
 
+      const stmt = sqlite.prepare(sql)
+      const rows = stmt.all(...params) as any[]
+
       const countStmt = sqlite.prepare(`
         SELECT COUNT(*) as count
         FROM attendance_sessions
