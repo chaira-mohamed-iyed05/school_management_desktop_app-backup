@@ -332,5 +332,86 @@ describe('Critical Bug Audit — Unenrolled Student Absence & Phantom Debt Preve
   })
 })
 
+describe('Session Cycle Counter (1 to 4 Monthly Cycle)', () => {
+  const calculateCycleNumber = (
+    currentSession: { id: number; groupId: number; sessionDate: string; plannedStartTime: string; sessionType: string },
+    allSessions: Array<{ id: number; groupId: number; sessionDate: string; plannedStartTime: string; sessionType: string }>
+  ) => {
+    if (currentSession.sessionType === 'cancelled') return null
+
+    const priorCount = allSessions.filter(s => {
+      if (s.groupId !== currentSession.groupId) return false
+      if (s.sessionType === 'cancelled') return false
+
+      if (s.sessionDate < currentSession.sessionDate) return true
+      if (s.sessionDate === currentSession.sessionDate && (s.plannedStartTime || '') < (currentSession.plannedStartTime || '')) return true
+      if (s.sessionDate === currentSession.sessionDate && (s.plannedStartTime || '') === (currentSession.plannedStartTime || '') && s.id < currentSession.id) return true
+      return false
+    }).length
+
+    return (priorCount % 4) + 1
+  }
+
+  it('cycles from 1 to 4 and rolls back to 1 on the 5th session', () => {
+    const sessions = [
+      { id: 1, groupId: 10, sessionDate: '2026-10-01', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 2, groupId: 10, sessionDate: '2026-10-08', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 3, groupId: 10, sessionDate: '2026-10-15', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 4, groupId: 10, sessionDate: '2026-10-22', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 5, groupId: 10, sessionDate: '2026-10-29', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 6, groupId: 10, sessionDate: '2026-11-05', plannedStartTime: '09:00', sessionType: 'regular' },
+    ]
+
+    expect(calculateCycleNumber(sessions[0], sessions)).toBe(1)
+    expect(calculateCycleNumber(sessions[1], sessions)).toBe(2)
+    expect(calculateCycleNumber(sessions[2], sessions)).toBe(3)
+    expect(calculateCycleNumber(sessions[3], sessions)).toBe(4)
+    expect(calculateCycleNumber(sessions[4], sessions)).toBe(1) // 5th session -> rolls back to 1!
+    expect(calculateCycleNumber(sessions[5], sessions)).toBe(2) // 6th session -> 2
+  })
+
+  it('does not increment counter for cancelled sessions', () => {
+    const sessions = [
+      { id: 1, groupId: 10, sessionDate: '2026-10-01', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 2, groupId: 10, sessionDate: '2026-10-08', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 3, groupId: 10, sessionDate: '2026-10-15', plannedStartTime: '09:00', sessionType: 'cancelled' }, // CANCELLED
+      { id: 4, groupId: 10, sessionDate: '2026-10-22', plannedStartTime: '09:00', sessionType: 'regular' },
+    ]
+
+    expect(calculateCycleNumber(sessions[0], sessions)).toBe(1)
+    expect(calculateCycleNumber(sessions[1], sessions)).toBe(2)
+    expect(calculateCycleNumber(sessions[2], sessions)).toBeNull() // Cancelled session itself has no cycle number
+    expect(calculateCycleNumber(sessions[3], sessions)).toBe(3) // Next conducted session is session 3!
+  })
+
+  it('correctly sequences multiple sessions for the same group on the same day', () => {
+    const sessions = [
+      { id: 1, groupId: 10, sessionDate: '2026-10-01', plannedStartTime: '09:00', sessionType: 'regular' },
+      // Same day, two sessions (morning & afternoon)
+      { id: 2, groupId: 10, sessionDate: '2026-10-08', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 3, groupId: 10, sessionDate: '2026-10-08', plannedStartTime: '14:00', sessionType: 'regular' },
+    ]
+
+    expect(calculateCycleNumber(sessions[0], sessions)).toBe(1)
+    expect(calculateCycleNumber(sessions[1], sessions)).toBe(2) // Morning session
+    expect(calculateCycleNumber(sessions[2], sessions)).toBe(3) // Afternoon session
+  })
+
+  it('maintains completely separate cycle counters for different groups on the same day', () => {
+    const sessions = [
+      // Group 10 has had 2 prior sessions
+      { id: 1, groupId: 10, sessionDate: '2026-10-01', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 2, groupId: 10, sessionDate: '2026-10-08', plannedStartTime: '09:00', sessionType: 'regular' },
+      { id: 5, groupId: 10, sessionDate: '2026-10-10', plannedStartTime: '09:00', sessionType: 'regular' },
+
+      // Group 20 is just starting today
+      { id: 6, groupId: 20, sessionDate: '2026-10-10', plannedStartTime: '11:00', sessionType: 'regular' },
+    ]
+
+    expect(calculateCycleNumber(sessions[2], sessions)).toBe(3) // Group 10 is at session 3
+    expect(calculateCycleNumber(sessions[3], sessions)).toBe(1) // Group 20 is at session 1
+  })
+})
+
 
 

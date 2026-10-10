@@ -573,11 +573,33 @@ export function registerSessionsHandlers(): void {
 
       sql += ` LIMIT ${Math.min(opts.limit || 50, 100)}`
 
-      const stmt = sqlite.prepare(sql)
-      const rows = stmt.all(...params) as any[]
+      const countStmt = sqlite.prepare(`
+        SELECT COUNT(*) as count
+        FROM attendance_sessions
+        WHERE group_id = ?
+          AND session_type != 'cancelled'
+          AND (
+            session_date < ?
+            OR (session_date = ? AND COALESCE(planned_start_time, '') < ?)
+            OR (session_date = ? AND COALESCE(planned_start_time, '') = ? AND id < ?)
+          )
+      `)
 
       return rows.map((row) => {
         const dayInfo = getDayInfo(row.session_date)
+        const startTimeStr = row.planned_start_time || row.actual_start_time || ''
+        const priorCount = (countStmt.get(
+          row.group_id,
+          row.session_date,
+          row.session_date,
+          startTimeStr,
+          row.session_date,
+          startTimeStr,
+          row.id
+        ) as { count: number } | undefined)?.count ?? 0
+
+        const cycleSessionNumber = (priorCount % 4) + 1
+
         return {
           id: row.id,
           groupId: row.group_id,
@@ -594,6 +616,7 @@ export function registerSessionsHandlers(): void {
           price: row.price !== undefined ? row.price : null,
           monthlyPrice: row.monthly_price ?? null,
           status: row.status,
+          cycleSessionNumber,
         }
       })
     } catch (err) {

@@ -47,6 +47,7 @@ interface TodaySession {
   sessionDate: string
   plannedStartTime?: string
   status: string
+  cycleSessionNumber?: number
 }
 
 interface Stats {
@@ -579,6 +580,11 @@ export default function Dashboard() {
                     <p className="text-slate-400 text-[11px]">{sess.plannedStartTime ?? '--:--'}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {sess.cycleSessionNumber && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-xs">
+                        {lang === 'ar' ? `حصة ${sess.cycleSessionNumber}` : `Séance ${sess.cycleSessionNumber}`}
+                      </span>
+                    )}
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                       sess.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'
                     }`}>
